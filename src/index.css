@@ -1,3 +1,6 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,700;1,400;1,700&family=Open+Sans:ital,wght@0,400;0,700;1,400&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Montserrat:wght@400;700&family=Lato:ital,wght@0,400;0,700;1,400&family=Poppins:wght@400;700&display=swap');
+
 :root {
   --text: #6b6375;
   --text-h: #08060d;
@@ -51,16 +54,115 @@
 }
 
 #root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
+  width: 100%;
   box-sizing: border-box;
 }
+
+/* ── Storefront brand tokens ─────────────────────────────────────────────── */
+:root {
+  --brand: #1D4ED8;
+  --brand-dk: #1E3A8A;
+  --brand-lt: #EFF6FF;
+  --ink: #0F172A;
+  --ink-mid: #1E293B;
+  --ink-soft: #64748B;
+  --sand: #F8FAFC;
+  --sand-card: #F1F5F9;
+  --stor-border: #E2E8F0;
+  --gold: #3B82F6;
+}
+
+/* ── Storefront animations ───────────────────────────────────────────────── */
+@keyframes stor-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+@keyframes stor-float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-14px); }
+}
+@keyframes stor-fadeInUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes stor-word-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes stor-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+@keyframes stor-spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ── Scroll-reveal ───────────────────────────────────────────────────────── */
+.stor-reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.65s ease, transform 0.65s ease;
+}
+.stor-reveal.stor-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.stor-reveal-delay-1 { transition-delay: 0.1s; }
+.stor-reveal-delay-2 { transition-delay: 0.2s; }
+.stor-reveal-delay-3 { transition-delay: 0.3s; }
+.stor-reveal-delay-4 { transition-delay: 0.4s; }
+
+/* ── Word cycling animation ──────────────────────────────────────────────── */
+.stor-word-cycle {
+  display: inline-block;
+  animation: stor-word-in 0.4s cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+/* ── Hover cards ─────────────────────────────────────────────────────────── */
+.stor-product-card {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  cursor: pointer;
+}
+.stor-product-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 48px rgba(28, 25, 23, 0.12);
+}
+
+.stor-btn-primary {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+.stor-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(29, 78, 216, 0.35);
+  background-color: #1E3A8A !important;
+}
+.stor-btn-primary:active {
+  transform: translateY(0);
+}
+
+.stor-btn-outline {
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.stor-btn-outline:hover {
+  background-color: rgba(29, 78, 216, 0.07) !important;
+}
+
+/* ── Nav link hover ──────────────────────────────────────────────────────── */
+.stor-nav-link {
+  position: relative;
+  transition: color 0.15s ease;
+}
+.stor-nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: -2px; left: 0;
+  width: 0; height: 2px;
+  background: var(--brand);
+  transition: width 0.2s ease;
+}
+.stor-nav-link:hover::after { width: 100%; }
+.stor-nav-link:hover { color: var(--brand) !important; }
 
 body {
   margin: 0;
