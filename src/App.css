@@ -8,51 +8,38 @@
   .stor-hamburger   { display: flex !important; }
 }
 
-/* Hero two-column → stacked */
+/* ── Hero ──────────────────────────────────────────────────────────────────── */
 .stor-hero-layout {
   display: flex;
   align-items: center;
   gap: 48px;
 }
 @media (max-width: 900px) {
-  .stor-hero-layout {
-    flex-direction: column;
-    gap: 28px;
-  }
+  .stor-hero-layout { flex-direction: column; gap: 28px; text-align: center; }
 }
-
-/* Hero image: hide on small screens */
 @media (max-width: 900px) {
   .stor-hero-image { display: none !important; }
 }
 
-/* Explore categories grid */
+/* ── Explore categories grid ────────────────────────────────────────────────── */
 .stor-explore-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 16px;
 }
-@media (max-width: 900px) {
-  .stor-explore-grid { grid-template-columns: repeat(3, 1fr); }
-}
-@media (max-width: 540px) {
-  .stor-explore-grid { grid-template-columns: repeat(2, 1fr); }
-}
+@media (max-width: 900px)  { .stor-explore-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 540px)  { .stor-explore-grid { grid-template-columns: repeat(2, 1fr); } }
 
-/* Bestsellers 5-col grid */
+/* ── Product cards grid ─────────────────────────────────────────────────────── */
 .stor-products-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 16px;
 }
-@media (max-width: 1100px) {
-  .stor-products-grid { grid-template-columns: repeat(3, 1fr); }
-}
-@media (max-width: 640px) {
-  .stor-products-grid { grid-template-columns: repeat(2, 1fr); }
-}
+@media (max-width: 1100px) { .stor-products-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 640px)  { .stor-products-grid { grid-template-columns: repeat(2, 1fr); } }
 
-/* Product detail two-column */
+/* ── Product detail two-column ──────────────────────────────────────────────── */
 .stor-product-layout {
   display: grid;
   grid-template-columns: 1fr 480px;
@@ -60,82 +47,201 @@
   align-items: start;
 }
 @media (max-width: 1024px) {
-  .stor-product-layout {
-    grid-template-columns: 1fr;
-    gap: 32px;
-  }
+  .stor-product-layout { grid-template-columns: 1fr; gap: 32px; }
 }
+@media (max-width: 1024px) {
+  .stor-config-panel { position: static !important; }
+}
+.stor-config-panel { position: sticky; top: 80px; }
 
-/* Related products 5-col */
+/* ── Thumbnail strip ────────────────────────────────────────────────────────── */
+.stor-thumb-strip { display: flex; gap: 10px; overflow-x: auto; }
+
+/* ── Related products grid ──────────────────────────────────────────────────── */
 .stor-related-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 16px;
 }
-@media (max-width: 1024px) {
-  .stor-related-grid { grid-template-columns: repeat(3, 1fr); }
-}
-@media (max-width: 540px) {
-  .stor-related-grid { grid-template-columns: repeat(2, 1fr); }
-}
+@media (max-width: 1024px) { .stor-related-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 540px)  { .stor-related-grid { grid-template-columns: repeat(2, 1fr); } }
 
-/* Cart two-column */
+/* ── Cart two-column ────────────────────────────────────────────────────────── */
 .stor-cart-layout {
   display: grid;
   grid-template-columns: 1fr 320px;
   gap: 24px;
   align-items: start;
 }
-@media (max-width: 900px) {
-  .stor-cart-layout {
-    grid-template-columns: 1fr;
-  }
-}
+@media (max-width: 900px) { .stor-cart-layout { grid-template-columns: 1fr; } }
 
-/* Catalog header */
-@media (max-width: 640px) {
-  .stor-catalog-header { padding: 36px 16px 32px !important; }
-  .stor-catalog-header h1 { font-size: 26px !important; }
-}
-
-/* Section padding */
-@media (max-width: 640px) {
-  .stor-section-pad { padding-left: 16px !important; padding-right: 16px !important; }
-}
-
-/* Checkout two-column */
+/* ── Checkout two-column ────────────────────────────────────────────────────── */
 .stor-checkout-layout {
   display: grid;
   grid-template-columns: 1fr 360px;
   gap: 32px;
   align-items: start;
 }
-@media (max-width: 900px) {
-  .stor-checkout-layout { grid-template-columns: 1fr; }
+@media (max-width: 900px) { .stor-checkout-layout { grid-template-columns: 1fr; } }
+
+/* ── Checkout form grid (name fields) ───────────────────────────────────────── */
+.stor-form-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 540px) { .stor-form-2col { grid-template-columns: 1fr; } }
+
+/* ── Catalog header ─────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .stor-catalog-header { padding: 32px 16px 28px !important; }
+  .stor-catalog-header h1 { font-size: 24px !important; }
 }
 
-/* For your business 3-col */
+/* ── Admin sidebar layout ───────────────────────────────────────────────────── */
+.stor-admin-layout {
+  display: flex;
+  min-height: 100vh;
+}
+.stor-admin-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+}
+@media (max-width: 768px) {
+  .stor-admin-sidebar { display: none !important; }
+  .stor-admin-content { padding: 16px !important; }
+}
+
+/* Admin stats grid */
+.stor-admin-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+@media (max-width: 900px) { .stor-admin-stats { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .stor-admin-stats { grid-template-columns: 1fr 1fr; } }
+
+/* Admin main+sidebar grid */
+.stor-admin-main-grid {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 20px;
+}
+@media (max-width: 900px) { .stor-admin-main-grid { grid-template-columns: 1fr; } }
+
+/* Admin orders table — horizontal scroll on mobile */
+.stor-table-wrap { overflow-x: auto; }
+
+/* ── FinalStepsPage two-column ──────────────────────────────────────────────── */
+.stor-finalsteps-body {
+  display: flex;
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 40px 24px;
+  gap: 48px;
+  align-items: flex-start;
+}
+.stor-finalsteps-preview {
+  width: 340px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 72px;
+}
+@media (max-width: 900px) {
+  .stor-finalsteps-body { flex-direction: column-reverse; gap: 24px; padding: 20px 16px; }
+  .stor-finalsteps-preview { width: 100%; position: static; }
+}
+
+/* ── MyOrders / Confirmation — side padding ─────────────────────────────────── */
+@media (max-width: 640px) {
+  .stor-orders-wrap { padding: 20px 16px !important; }
+  .stor-confirmation-wrap { padding: 20px 16px !important; }
+}
+
+/* ── Login / Signup two-column ──────────────────────────────────────────────── */
+.stor-auth-layout {
+  display: flex;
+  min-height: 100vh;
+}
+.stor-auth-left {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 32px;
+}
+.stor-auth-right {
+  flex: 0 0 420px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 40px;
+  background: #F8FAFC;
+  border-left: 1px solid #E2E8F0;
+}
+@media (max-width: 768px) {
+  .stor-auth-layout { flex-direction: column; }
+  .stor-auth-left   { display: none !important; }
+  .stor-auth-right  { flex: 1; border-left: none; padding: 32px 20px; width: 100%; }
+}
+
+/* ── OAuth buttons row → stack on tiny screens ──────────────────────────────── */
+.stor-oauth-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 360px) { .stor-oauth-row { grid-template-columns: 1fr; } }
+
+/* ── Footer grid ────────────────────────────────────────────────────────────── */
+.stor-footer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 32px 24px;
+}
+
+/* ── For-your-business grid ─────────────────────────────────────────────────── */
 .stor-biz-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 20px;
 }
+@media (max-width: 900px) { .stor-biz-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 540px) { .stor-biz-grid { grid-template-columns: 1fr; } }
+
+/* ── Global horizontal overflow guard ──────────────────────────────────────── */
+body { overflow-x: hidden; }
+
+/* ── Responsive section wrappers ────────────────────────────────────────────── */
+.stor-section {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding-left: 32px;
+  padding-right: 32px;
+}
+@media (max-width: 640px) {
+  .stor-section { padding-left: 16px; padding-right: 16px; }
+}
+
+/* Hero text left col full width on mobile */
 @media (max-width: 900px) {
-  .stor-biz-grid { grid-template-columns: repeat(2, 1fr); }
-}
-@media (max-width: 540px) {
-  .stor-biz-grid { grid-template-columns: 1fr; }
+  .stor-hero-layout .stor-hero-text { text-align: center; }
+  .stor-hero-layout .stor-hero-cta  { justify-content: center; }
 }
 
-/* Thumbnail strip scroll on mobile */
-.stor-thumb-strip {
-  display: flex;
-  gap: 10px;
+/* Category tab bar — scrollable on mobile */
+.stor-tab-bar {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
-/* Sticky config panel — don't stick on mobile (it's below the gallery) */
-.stor-config-panel { position: sticky; top: 80px; }
-@media (max-width: 1024px) {
-  .stor-config-panel { position: static; }
+/* Admin detail panel — full screen on mobile when open */
+@media (max-width: 768px) {
+  .stor-admin-detail {
+    position: fixed !important;
+    top: 0; left: 0; right: 0; bottom: 0;
+    width: 100% !important;
+    z-index: 100;
+  }
 }

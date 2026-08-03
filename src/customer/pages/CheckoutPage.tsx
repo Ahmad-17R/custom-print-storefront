@@ -98,7 +98,7 @@ export function CheckoutPage() {
             <div style={{ backgroundColor: 'white', borderRadius: 12, border: '1px solid #E2E8F0', padding: '24px' }}>
               <h2 style={{ fontFamily: "'Poppins', system-ui", fontWeight: 700, fontSize: 18, color: '#0F172A', margin: '0 0 20px' }}>Delivery Details</h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="stor-form-2col" style={{ gap: 12 }}>
                   <div>
                     <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#1E293B', fontFamily: 'system-ui', marginBottom: 5 }}>Full Name *</label>
                     <input value={address.fullName} onChange={e => setAddress(p => ({ ...p, fullName: e.target.value }))} placeholder="Your full name" style={inp} />
@@ -116,7 +116,7 @@ export function CheckoutPage() {
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#1E293B', fontFamily: 'system-ui', marginBottom: 5 }}>Address Line 2</label>
                   <input value={address.line2} onChange={e => setAddress(p => ({ ...p, line2: e.target.value }))} placeholder="Street, area (optional)" style={inp} />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="stor-form-2col" style={{ gap: 12 }}>
                   <div>
                     <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#1E293B', fontFamily: 'system-ui', marginBottom: 5 }}>City *</label>
                     <input value={address.city} onChange={e => setAddress(p => ({ ...p, city: e.target.value }))} placeholder="e.g. Dubai Marina" style={inp} />

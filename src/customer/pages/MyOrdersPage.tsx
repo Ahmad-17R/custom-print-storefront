@@ -64,7 +64,7 @@ export function MyOrdersPage() {
         <Link to="/catalog" style={{ fontSize: 13, color: '#1D4ED8', fontFamily: 'system-ui', textDecoration: 'none', fontWeight: 600 }}>+ New Order</Link>
       </div>
 
-      <div style={{ maxWidth: 760, margin: '0 auto', padding: '36px 24px' }}>
+      <div className="stor-orders-wrap" style={{ maxWidth: 760, margin: '0 auto', padding: '36px 24px' }}>
         <h1 style={{ fontFamily: "'Poppins', system-ui", fontWeight: 800, fontSize: 26, color: '#0F172A', margin: '0 0 24px', letterSpacing: '-0.02em' }}>My Orders</h1>
 
         {/* Filter tabs */}

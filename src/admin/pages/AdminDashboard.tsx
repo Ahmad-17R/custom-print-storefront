@@ -101,7 +101,7 @@ export function AdminDashboard() {
 
         <div style={{ padding: '28px' }}>
           {/* Stats */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 28 }}>
+          <div className="stor-admin-stats" style={{ marginBottom: 28 }}>
             {STATS.map(s => (
               <div key={s.label} style={{ backgroundColor: 'white', borderRadius: 12, border: '1px solid #E2E8F0', padding: '20px' }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#94A3B8', fontFamily: 'system-ui', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>{s.label}</div>
@@ -113,7 +113,7 @@ export function AdminDashboard() {
             ))}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 20 }}>
+          <div className="stor-admin-main-grid" style={{ gap: 20 }}>
             {/* Recent orders */}
             <div style={{ backgroundColor: 'white', borderRadius: 12, border: '1px solid #E2E8F0', overflow: 'hidden' }}>
               <div style={{ padding: '18px 20px', borderBottom: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

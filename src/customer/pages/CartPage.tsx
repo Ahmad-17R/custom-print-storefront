@@ -28,7 +28,7 @@ export function CartPage() {
 
   return (
     <div style={{ backgroundColor: '#F8FAFC', minHeight: '100vh' }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '36px 24px' }}>
+      <div className="stor-section" style={{ paddingTop: 36, paddingBottom: 36 }}>
         <h1 style={{ fontFamily: "'Poppins', system-ui", fontWeight: 800, fontSize: 28, color: '#0F172A', margin: '0 0 28px', letterSpacing: '-0.02em' }}>
           Your Cart <span style={{ fontSize: 18, fontWeight: 600, color: '#64748B' }}>({items.length} item{items.length !== 1 ? 's' : ''})</span>
         </h1>

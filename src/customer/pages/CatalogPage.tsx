@@ -257,7 +257,7 @@ export function CatalogPage() {
       </div>
 
       {/* Grid */}
-      <div style={{ maxWidth: 1440, margin: '0 auto', padding: '32px 32px' }}>
+      <div className="stor-section" style={{ paddingTop: 32, paddingBottom: 32 }}>
         <p style={{ fontSize: 13, color: '#94A3B8', fontFamily: 'system-ui', marginBottom: 20 }}>
           {filtered.length} product{filtered.length !== 1 ? 's' : ''}
           {activeCategory !== 'All' ? ` in ${activeCategory}` : ''}

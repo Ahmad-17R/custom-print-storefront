@@ -62,12 +62,7 @@ export default function Footer() {
   return (
     <footer style={{ backgroundColor: '#0F172A', color: '#F1F5F9', marginTop: 0 }}>
       {/* Main footer grid */}
-      <div style={{
-        maxWidth: 1200, margin: '0 auto', padding: '64px 24px 48px',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-        gap: 40,
-      }}>
+      <div className="stor-footer-grid" style={{ maxWidth: 1200, margin: '0 auto', padding: '64px 24px 48px', gap: 40 }}>
         {/* Brand column */}
         <div style={{ gridColumn: 'span 1' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>

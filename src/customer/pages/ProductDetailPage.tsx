@@ -274,7 +274,7 @@ export function ProductDetailPage() {
   return (
     <div style={{ backgroundColor: '#F8FAFC', minHeight: '100vh' }}>
       {/* Breadcrumb */}
-      <div style={{ maxWidth: 1440, margin: '0 auto', padding: '16px 32px', display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div className="stor-section" style={{ paddingTop: 16, paddingBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
         <Link to="/" style={{ fontSize: 13, color: '#64748B', fontFamily: 'system-ui', textDecoration: 'none' }}>Home</Link>
         <span style={{ color: '#CBD5E1', fontSize: 13 }}>/</span>
         <Link to="/catalog" style={{ fontSize: 13, color: '#64748B', fontFamily: 'system-ui', textDecoration: 'none' }}>All Products</Link>
@@ -283,7 +283,7 @@ export function ProductDetailPage() {
       </div>
 
       {/* Main two-column layout */}
-      <div className="stor-product-layout" style={{ maxWidth: 1440, margin: '0 auto', padding: '0 32px 48px' }}>
+      <div className="stor-product-layout stor-section" style={{ paddingBottom: 48 }}>
 
         {/* LEFT — Image gallery */}
         <div>
@@ -535,7 +535,7 @@ export function ProductDetailPage() {
       </div>
 
       {/* Related products */}
-      <div style={{ maxWidth: 1440, margin: '0 auto', padding: '0 32px 60px' }}>
+      <div className="stor-section" style={{ paddingBottom: 60 }}>
         <h2 style={{ fontFamily: "'Poppins', system-ui", fontWeight: 700, fontSize: 22, color: '#0F172A', marginBottom: 20 }}>
           You may also need
         </h2>

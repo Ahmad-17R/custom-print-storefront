@@ -65,10 +65,10 @@ export function FinalStepsPage() {
       </header>
 
       {/* ── Body ── */}
-      <div style={s.body}>
+      <div className="stor-finalsteps-body">
 
         {/* ── LEFT — product preview ── */}
-        <div style={s.previewCol}>
+        <div className="stor-finalsteps-preview">
           <div style={s.previewSticky}>
 
             {/* Zone thumbnails */}

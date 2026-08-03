@@ -5,7 +5,7 @@ export function OrderConfirmationPage() {
   const orderNumber = id ?? 'MPW-20260803-4821'
 
   return (
-    <div style={{ backgroundColor: '#F8FAFC', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
+    <div className="stor-confirmation-wrap" style={{ backgroundColor: '#F8FAFC', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 16px' }}>
       <div style={{ maxWidth: 520, width: '100%', textAlign: 'center' }}>
         {/* Success icon */}
         <div style={{ width: 80, height: 80, borderRadius: '50%', backgroundColor: '#DCFCE7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>

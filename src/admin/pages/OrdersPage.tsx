@@ -76,7 +76,7 @@ export function OrdersPage() {
   return (
     <div style={{ display: 'flex', height: '100vh', backgroundColor: '#F8FAFC', fontFamily: 'system-ui' }}>
       {/* Sidebar */}
-      <div style={{ width: 220, backgroundColor: '#0F172A', display: 'flex', flexDirection: 'column' }}>
+      <div className="stor-admin-sidebar" style={{ width: 220, backgroundColor: '#0F172A', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid #1E293B' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <svg width="22" height="22" viewBox="0 0 28 28" fill="none">
@@ -132,8 +132,8 @@ export function OrdersPage() {
           </div>
 
           {/* Table */}
-          <div style={{ backgroundColor: 'white', borderRadius: 12, border: '1px solid #E2E8F0', overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="stor-table-wrap" style={{ backgroundColor: 'white', borderRadius: 12, border: '1px solid #E2E8F0', overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
               <thead>
                 <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
                   {['Order #', 'Customer', 'Date', 'Items', 'Total', 'Status', ''].map(h => (

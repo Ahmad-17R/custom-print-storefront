@@ -131,7 +131,7 @@ function HeroBanner() {
       borderBottom: '1px solid #BFDBFE',
       overflow: 'hidden', position: 'relative',
     }}>
-      <div className="stor-hero-layout" style={{ maxWidth: 1500, margin: '0 auto', padding: '52px 32px 48px' }}>
+      <div className="stor-hero-layout stor-section" style={{ paddingTop: 52, paddingBottom: 48 }}>
         {/* Left copy */}
         <div style={{ flex: 1, minWidth: 280 }}>
           <div style={{
@@ -498,7 +498,7 @@ function ProductCarousel({ title, subtitle, keys, badges = {} }: CarouselProps) 
 
   return (
     <section style={{ backgroundColor: 'white', padding: '48px 0', borderBottom: '1px solid #F0F0F0' }}>
-      <div style={{ maxWidth: 1500, margin: '0 auto', padding: '0 32px' }}>
+      <div className="stor-section">
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 24 }}>
           <div>
             <h2 style={{
@@ -664,7 +664,7 @@ function TrustStrip() {
 
   return (
     <section style={{ backgroundColor: 'white', borderBottom: '1px solid #F0F0F0' }}>
-      <div style={{ maxWidth: 1500, margin: '0 auto', padding: '0 32px' }}>
+      <div className="stor-section">
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
