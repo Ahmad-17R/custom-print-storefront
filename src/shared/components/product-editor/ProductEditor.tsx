@@ -492,7 +492,7 @@ export default function ProductEditor({ initialProductType = "business_card" }: 
             ctx.clip();
           } else {
             ctx.beginPath();
-            (ctx as unknown as { roundRect: (x: number, y: number, w: number, h: number, rx: number, ry: number) => void })
+            (ctx as unknown as { roundRect: (x: number, y: number, w: number, h: number, radii: number[]) => void })
               .roundRect(-rw, -rh, rw * 2, rh * 2, [Math.min(rx, ry)]);
             ctx.clip();
           }
