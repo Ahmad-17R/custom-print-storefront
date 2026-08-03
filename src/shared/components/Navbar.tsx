@@ -28,10 +28,9 @@ function UserMenu() {
 
   if (!user) return null
 
-  const initials = (user.displayName ?? user.email ?? '?')
-    .split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
-
-  const avatar = user.photoURL
+  const displayName: string = user.user_metadata?.full_name ?? user.user_metadata?.name ?? user.email ?? '?'
+  const initials = displayName.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
+  const avatar: string | undefined = user.user_metadata?.avatar_url
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>
@@ -46,7 +45,7 @@ function UserMenu() {
         }}
       >
         {avatar ? (
-          <img src={avatar} alt={user.displayName ?? 'User'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <img src={avatar} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
           <div style={{
             width: '100%', height: '100%', backgroundColor: '#1D4ED8',
@@ -70,7 +69,7 @@ function UserMenu() {
           {/* User info header */}
           <div style={{ padding: '14px 16px', borderBottom: '1px solid #F5F3EE' }}>
             <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#0F172A', fontFamily: 'system-ui, sans-serif', lineHeight: 1.3 }}>
-              {user.displayName ?? 'MyPrintingWorld User'}
+              {displayName}
             </p>
             <p style={{ margin: '2px 0 0', fontSize: 12, color: '#78716C', fontFamily: 'system-ui, sans-serif' }}>
               {user.email}

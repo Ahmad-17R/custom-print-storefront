@@ -32,7 +32,7 @@ export function OrderConfirmationPage() {
 
         {/* Summary card */}
         <div style={{ backgroundColor: 'white', borderRadius: 14, border: '1px solid #E2E8F0', padding: '24px', textAlign: 'left', marginBottom: 24 }}>
-          <h3 style={{ fontFamily: "'Poppins', system-ui", fontWeight: 700, fontSize: 14, color: '#64748B', margin: '0 0 16px', textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 11 }}>Order Details</h3>
+          <h3 style={{ fontFamily: "'Poppins', system-ui", fontWeight: 700, fontSize: 11, color: '#64748B', margin: '0 0 16px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Order Details</h3>
           {[
             { label: 'Business Cards', desc: '500 cards · Soft Touch Lamination', price: 'AED 87' },
             { label: 'Letterhead × 2', desc: '250 sheets · 120 GSM Premium', price: 'AED 258' },

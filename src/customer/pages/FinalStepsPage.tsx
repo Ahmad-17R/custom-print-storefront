@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, ShoppingCart, Check, ChevronDown, Truck, Shield } from "lucide-react";
 import { TEMPLATES } from "../../shared/components/product-editor/templates";
-import type { PrintOptionGroup, CanvasShape } from "../../shared/components/product-editor/types";
+import type { CanvasShape } from "../../shared/components/product-editor/types";
 
 function getPreviewBorderRadius(canvasShape: CanvasShape, cornerRadius?: number, previewW?: number): string {
   switch (canvasShape) {
@@ -73,7 +73,7 @@ export function FinalStepsPage() {
 
             {/* Zone thumbnails */}
             <div style={s.zoneRow}>
-              {template.zones.map((z, i) => {
+              {template.zones.map((z) => {
                 const aspect = z.width / z.height;
                 const previewW = Math.min(320, 320);
                 const previewH = previewW / aspect;

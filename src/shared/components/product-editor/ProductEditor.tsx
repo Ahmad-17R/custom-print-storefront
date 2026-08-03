@@ -5,7 +5,7 @@ import {
   ChevronUp, ChevronDown, Download, RotateCw, Undo2, Redo2,
   ZoomIn, ZoomOut, Maximize2, Eye, EyeOff, AlignLeft, AlignCenter,
   AlignRight, Bold, Italic, Underline, FlipHorizontal, FlipVertical,
-  Layers, Palette, ShoppingCart, Check,
+  Layers, Palette, ShoppingCart,
 } from "lucide-react";
 import { TEMPLATES } from "./templates";
 import type { Layer, TextLayer, ImageLayer, ShapeLayer, DragState, DragMode, GradientConfig } from "./types";
@@ -36,12 +36,6 @@ const BG_PRESETS = [
 
 // ── Gradient helpers ──────────────────────────────────────────────────────────
 
-const GRADIENT_PRESETS = [
-  { label: "→", angle: 90,  title: "Left to right"  },
-  { label: "↓", angle: 180, title: "Top to bottom"  },
-  { label: "↗", angle: 45,  title: "Diagonal ↗"    },
-  { label: "↘", angle: 135, title: "Diagonal ↘"    },
-];
 
 function gradientToCss(g: GradientConfig): string {
   const stops = g.stops.map((s) => `${s.color} ${s.position}%`).join(", ");
@@ -499,7 +493,7 @@ export default function ProductEditor({ initialProductType = "business_card" }: 
           } else {
             ctx.beginPath();
             (ctx as unknown as { roundRect: (x: number, y: number, w: number, h: number, rx: number, ry: number) => void })
-              .roundRect(-rw, -rh, rw * 2, rh * 2, Math.min(rx, ry));
+              .roundRect(-rw, -rh, rw * 2, rh * 2, [Math.min(rx, ry)]);
             ctx.clip();
           }
         }

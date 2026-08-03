@@ -447,7 +447,7 @@ function ProductMockup({ productKey, c1, c2 }: { productKey: string; c1: string;
   if (productKey === 'business_card_circle') {
     return (
       <svg width="90" height="90" viewBox="0 0 90 90" fill="none">
-        <circle cx="45" cy="45" r="42" fill={c1} opacity="0.08" stroke={c1} strokeWidth="1.5" opacity="0.2"/>
+        <circle cx="45" cy="45" r="42" fill={c1} opacity="0.08" stroke={c1} strokeWidth="1.5"/>
         <circle cx="45" cy="45" r="38" fill="white" stroke="#E8E8E8" strokeWidth="1"/>
         <circle cx="45" cy="34" r="10" fill={c1} opacity="0.15" stroke={c1} strokeWidth="1.5"/>
         <rect x="28" y="57" width="34" height="4" rx="2" fill="#CBD5E1"/>
