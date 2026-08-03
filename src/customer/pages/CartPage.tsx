@@ -33,7 +33,7 @@ export function CartPage() {
           Your Cart <span style={{ fontSize: 18, fontWeight: 600, color: '#64748B' }}>({items.length} item{items.length !== 1 ? 's' : ''})</span>
         </h1>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 24, alignItems: 'start' }}>
+        <div className="stor-cart-layout">
           {/* Items */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {items.map(item => (

@@ -215,7 +215,7 @@ export function CatalogPage() {
   return (
     <div style={{ backgroundColor: '#F8FAFC', minHeight: '100vh' }}>
       {/* Header */}
-      <div style={{ background: 'linear-gradient(135deg, #0F172A 55%, #1E3A8A)', padding: '52px 24px 44px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+      <div className="stor-catalog-header" style={{ background: 'linear-gradient(135deg, #0F172A 55%, #1E3A8A)', padding: '52px 24px 44px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: -60, right: -60, width: 240, height: 240, borderRadius: '50%', backgroundColor: '#1D4ED8', opacity: 0.07 }} />
         <div style={{ position: 'absolute', bottom: -40, left: 80, width: 160, height: 160, borderRadius: '50%', backgroundColor: '#3B82F6', opacity: 0.06 }} />
         <h1 style={{ fontFamily: "'Poppins', system-ui", fontWeight: 800, fontSize: 36, color: 'white', margin: '0 0 10px', letterSpacing: '-0.02em', position: 'relative' }}>

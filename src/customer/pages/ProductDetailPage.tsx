@@ -283,7 +283,7 @@ export function ProductDetailPage() {
       </div>
 
       {/* Main two-column layout */}
-      <div style={{ maxWidth: 1440, margin: '0 auto', padding: '0 32px 48px', display: 'grid', gridTemplateColumns: '1fr 480px', gap: 48, alignItems: 'start' }}>
+      <div className="stor-product-layout" style={{ maxWidth: 1440, margin: '0 auto', padding: '0 32px 48px' }}>
 
         {/* LEFT — Image gallery */}
         <div>
@@ -306,7 +306,7 @@ export function ProductDetailPage() {
           </div>
 
           {/* Thumbnail strip */}
-          <div style={{ display: 'flex', gap: 10 }}>
+          <div className="stor-thumb-strip">
             {product.images.map((src, i) => (
               <button key={i} onClick={() => setActiveImg(i)} style={{
                 width: 80, height: 70, borderRadius: 10, overflow: 'hidden', border: 'none',
@@ -398,7 +398,7 @@ export function ProductDetailPage() {
         </div>
 
         {/* RIGHT — Config panel */}
-        <div style={{ position: 'sticky', top: 80 }}>
+        <div className="stor-config-panel">
           <div style={{ backgroundColor: 'white', borderRadius: 16, border: '1px solid #E2E8F0', padding: '28px 28px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
 
             {/* Category + title */}
@@ -539,7 +539,7 @@ export function ProductDetailPage() {
         <h2 style={{ fontFamily: "'Poppins', system-ui", fontWeight: 700, fontSize: 22, color: '#0F172A', marginBottom: 20 }}>
           You may also need
         </h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16 }}>
+        <div className="stor-related-grid">
           {related.map(p => (
             <Link key={p.id} to={`/products/${p.slug}`} style={{ textDecoration: 'none' }}>
               <div style={{

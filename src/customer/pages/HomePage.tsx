@@ -131,7 +131,7 @@ function HeroBanner() {
       borderBottom: '1px solid #BFDBFE',
       overflow: 'hidden', position: 'relative',
     }}>
-      <div style={{ maxWidth: 1500, margin: '0 auto', padding: '52px 32px 48px', display: 'flex', alignItems: 'center', gap: 48 }}>
+      <div className="stor-hero-layout" style={{ maxWidth: 1500, margin: '0 auto', padding: '52px 32px 48px' }}>
         {/* Left copy */}
         <div style={{ flex: 1, minWidth: 280 }}>
           <div style={{
@@ -198,7 +198,7 @@ function HeroBanner() {
         </div>
 
         {/* Right: real photo */}
-        <div style={{ flex: '0 0 auto', position: 'relative' }}>
+        <div className="stor-hero-image" style={{ flex: '0 0 auto', position: 'relative' }}>
           <img
             src="https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=900&h=620&q=85&auto=format&fit=crop"
             alt="Premium custom business card printing"
@@ -283,11 +283,7 @@ function ExploreSection() {
           </button>
         </div>
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(5, 1fr)',
-          gap: 16,
-        }}>
+        <div className="stor-explore-grid">
           {EXPLORE_CATS.map(cat => (
             <button
               key={cat.key}

@@ -91,7 +91,7 @@ export function CheckoutPage() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 900, margin: '0 auto', padding: '32px 24px', display: 'grid', gridTemplateColumns: '1fr 300px', gap: 24, alignItems: 'start' }}>
+      <div className="stor-checkout-layout" style={{ maxWidth: 960, margin: '0 auto', padding: '32px 24px' }}>
         {/* Main */}
         <div>
           {step === 'delivery' && (
