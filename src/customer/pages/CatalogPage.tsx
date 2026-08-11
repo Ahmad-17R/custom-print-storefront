@@ -212,43 +212,48 @@ export function CatalogPage() {
     return matchCat && matchSearch
   })
 
-  return (
-    <div style={{ backgroundColor: '#F8FAFC', minHeight: '100vh' }}>
-      {/* Header */}
-      <div className="stor-catalog-header" style={{ background: 'linear-gradient(135deg, #0F172A 55%, #1E3A8A)', padding: '52px 24px 44px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: -60, right: -60, width: 240, height: 240, borderRadius: '50%', backgroundColor: '#1D4ED8', opacity: 0.07 }} />
-        <div style={{ position: 'absolute', bottom: -40, left: 80, width: 160, height: 160, borderRadius: '50%', backgroundColor: '#3B82F6', opacity: 0.06 }} />
-        <h1 style={{ fontFamily: "'Poppins', system-ui", fontWeight: 800, fontSize: 36, color: 'white', margin: '0 0 10px', letterSpacing: '-0.02em', position: 'relative' }}>
-          All Print Products
-        </h1>
-        <p style={{ color: '#94A3B8', fontSize: 15, fontFamily: 'system-ui', margin: '0 0 28px', position: 'relative' }}>
-          {CATALOG_PRODUCTS.length} products · Fully customizable · UAE studio · 24–48 hr turnaround
-        </p>
-        <div style={{ maxWidth: 480, margin: '0 auto', position: 'relative' }}>
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-            <circle cx="8" cy="8" r="5.5" stroke="#64748B" strokeWidth="1.5"/>
-            <path d="M12.5 12.5L16 16" stroke="#64748B" strokeWidth="1.5" strokeLinecap="round"/>
-          </svg>
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search products…"
-            style={{
-              width: '100%', boxSizing: 'border-box', padding: '13px 16px 13px 42px',
-              borderRadius: 10, border: '1.5px solid rgba(255,255,255,0.1)',
-              backgroundColor: 'rgba(255,255,255,0.07)', color: '#F8FAFC',
-              fontSize: 15, fontFamily: 'system-ui', outline: 'none',
-            }} />
-        </div>
-      </div>
+  const font = "'Poppins', system-ui, sans-serif"
 
-      {/* Category tabs */}
-      <div style={{ backgroundColor: 'white', borderBottom: '1px solid #E2E8F0', overflowX: 'auto', position: 'sticky', top: 64, zIndex: 10 }}>
-        <div style={{ display: 'flex', padding: '0 32px', minWidth: 'max-content' }}>
+  return (
+    <div style={{ backgroundColor: '#F8FAFC', minHeight: '100vh', fontFamily: font }}>
+
+      {/* Page header — matches homepage section style */}
+      <div style={{ backgroundColor: 'white', borderBottom: '1px solid #E2E8F0', padding: '32px 44px 0' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap', marginBottom: 24 }}>
+          <div>
+            <p style={{ fontSize: 12, fontWeight: 600, color: '#1D4ED8', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 6px' }}>
+              All Products
+            </p>
+            <h1 style={{ fontFamily: font, fontWeight: 800, fontSize: 28, color: '#0F172A', margin: 0, letterSpacing: '-0.02em' }}>
+              Print Products
+            </h1>
+            <p style={{ fontSize: 14, color: '#64748B', margin: '6px 0 0', fontFamily: 'system-ui' }}>
+              {CATALOG_PRODUCTS.length} products · UAE studio · 24–48 hr turnaround
+            </p>
+          </div>
+          {/* Search */}
+          <div style={{ position: 'relative', width: 280 }}>
+            <svg width="16" height="16" viewBox="0 0 18 18" fill="none" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+              <circle cx="8" cy="8" r="5.5" stroke="#94A3B8" strokeWidth="1.5"/>
+              <path d="M12.5 12.5L16 16" stroke="#94A3B8" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search products…"
+              style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px 10px 36px', borderRadius: 12, border: '1.5px solid #E2E8F0', fontSize: 14, fontFamily: 'system-ui', outline: 'none', background: '#F8FAFC', color: '#0F172A' }}
+              onFocus={e => (e.currentTarget.style.borderColor = '#1D4ED8')}
+              onBlur={e => (e.currentTarget.style.borderColor = '#E2E8F0')}
+            />
+          </div>
+        </div>
+
+        {/* Category tabs */}
+        <div style={{ display: 'flex', gap: 0, overflowX: 'auto', scrollbarWidth: 'none' }}>
           {CATEGORIES.map(cat => (
             <button key={cat} onClick={() => setActiveCategory(cat)} style={{
-              padding: '14px 18px', border: 'none', backgroundColor: 'transparent',
-              cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'system-ui',
+              padding: '12px 20px', border: 'none', background: 'transparent', cursor: 'pointer',
+              fontSize: 13, fontWeight: 600, fontFamily: 'system-ui', whiteSpace: 'nowrap',
               color: activeCategory === cat ? '#1D4ED8' : '#64748B',
               borderBottom: `2px solid ${activeCategory === cat ? '#1D4ED8' : 'transparent'}`,
-              transition: 'all 0.15s ease', whiteSpace: 'nowrap',
+              transition: 'color 0.15s, border-color 0.15s',
             }}>
               {cat}
             </button>
@@ -257,7 +262,7 @@ export function CatalogPage() {
       </div>
 
       {/* Grid */}
-      <div className="stor-section" style={{ paddingTop: 32, paddingBottom: 32 }}>
+      <div style={{ padding: '28px 44px 44px' }}>
         <p style={{ fontSize: 13, color: '#94A3B8', fontFamily: 'system-ui', marginBottom: 20 }}>
           {filtered.length} product{filtered.length !== 1 ? 's' : ''}
           {activeCategory !== 'All' ? ` in ${activeCategory}` : ''}
@@ -268,7 +273,10 @@ export function CatalogPage() {
         </div>
         {filtered.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px 0', color: '#64748B', fontFamily: 'system-ui' }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style={{ marginBottom: 12, opacity: 0.4 }}>
+              <circle cx="22" cy="22" r="14" stroke="#64748B" strokeWidth="2.5"/>
+              <path d="M33 33L43 43" stroke="#64748B" strokeWidth="2.5" strokeLinecap="round"/>
+            </svg>
             <p style={{ fontWeight: 600 }}>No products match "{search}"</p>
           </div>
         )}

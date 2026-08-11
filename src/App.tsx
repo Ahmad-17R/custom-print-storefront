@@ -27,12 +27,13 @@ const FULLSCREEN_PATHS = [
 
 function Layout() {
   const { pathname } = useLocation()
-  const isFullscreen = FULLSCREEN_PATHS.some(p => pathname.startsWith(p))
+  const isFullscreen = pathname === '/' || FULLSCREEN_PATHS.some(p => pathname.startsWith(p))
 
   if (isFullscreen) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
         <Routes>
+          <Route path="/"                      element={<HomePage />} />
           <Route path="/editor"               element={<EditorPage />} />
           <Route path="/final-steps"          element={<FinalStepsPage />} />
           <Route path="/login"                element={<LoginPage />} />

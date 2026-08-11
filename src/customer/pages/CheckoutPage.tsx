@@ -1,21 +1,39 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../../context/CartContext'
 
 const EMIRATES = ['Abu Dhabi', 'Dubai', 'Sharjah', 'Ajman', 'Umm Al Quwain', 'Ras Al Khaimah', 'Fujairah']
 
+const PAYMENT_ICONS: Record<string, React.ReactNode> = {
+  card: (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="1" y="4" width="18" height="12" rx="2" stroke="#1D4ED8" strokeWidth="1.5"/><path d="M1 8h18" stroke="#1D4ED8" strokeWidth="1.5"/><rect x="3" y="11" width="4" height="2" rx="1" fill="#1D4ED8"/></svg>
+  ),
+  apple_pay: (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M14.5 5.5c-1 .1-2.1.8-2.7 1.6-.6.8-.9 1.8-.8 2.8 1 0 2.1-.7 2.7-1.5.7-.8.9-1.8.8-2.9z" fill="#0F172A"/><path d="M14.6 9.8c-1.5 0-2.1.9-3.1.9s-1.7-.9-3-.9c-1.4 0-2.9.8-3.8 2.1-1.6 2.8-.4 7 1.1 9.3.8 1.1 1.7 2.4 2.9 2.3 1.1 0 1.5-.7 2.9-.7s1.7.7 2.9.7 2-.3 2.9-1.4l-.2-.1c-.7-.5-1.7-1.5-1.7-3.4 0-2.2 1.5-3.1 1.6-3.2C17.4 13.9 16 12 14.6 9.8z" fill="#0F172A"/></svg>
+  ),
+  google_pay: (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><text x="3" y="15" fontFamily="system-ui" fontWeight="700" fontSize="13" fill="#4285F4">G</text></svg>
+  ),
+  bank_transfer: (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M2 17h16M10 3l8 5H2l8-5z" stroke="#1D4ED8" strokeWidth="1.5" strokeLinejoin="round"/><rect x="4" y="8" width="2" height="7" rx="1" fill="#1D4ED8"/><rect x="9" y="8" width="2" height="7" rx="1" fill="#1D4ED8"/><rect x="14" y="8" width="2" height="7" rx="1" fill="#1D4ED8"/></svg>
+  ),
+  cash_on_delivery: (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="1" y="5" width="18" height="10" rx="2" stroke="#16A34A" strokeWidth="1.5"/><circle cx="10" cy="10" r="2.5" stroke="#16A34A" strokeWidth="1.5"/></svg>
+  ),
+}
+
 const PAYMENT_METHODS = [
-  { id: 'card',             label: 'Credit / Debit Card',  icon: '💳' },
-  { id: 'apple_pay',        label: 'Apple Pay',            icon: '🍎' },
-  { id: 'google_pay',       label: 'Google Pay',           icon: 'G' },
-  { id: 'bank_transfer',    label: 'Bank Transfer',        icon: '🏦' },
-  { id: 'cash_on_delivery', label: 'Cash on Delivery',     icon: '💵' },
+  { id: 'card',             label: 'Credit / Debit Card' },
+  { id: 'apple_pay',        label: 'Apple Pay' },
+  { id: 'google_pay',       label: 'Google Pay' },
+  { id: 'bank_transfer',    label: 'Bank Transfer' },
+  { id: 'cash_on_delivery', label: 'Cash on Delivery' },
 ]
 
 const inp: React.CSSProperties = {
   width: '100%', boxSizing: 'border-box',
-  padding: '11px 14px', border: '1.5px solid #E2E8F0',
-  borderRadius: 8, fontSize: 14, fontFamily: 'system-ui',
+  padding: '12px 16px', border: '1.5px solid #E2E8F0',
+  borderRadius: 12, fontSize: 14, fontFamily: "'Poppins', system-ui",
   color: '#0F172A', outline: 'none', backgroundColor: 'white',
 }
 
@@ -52,20 +70,6 @@ export function CheckoutPage() {
 
   return (
     <div style={{ backgroundColor: '#F8FAFC', minHeight: '100vh' }}>
-      {/* Header */}
-      <div style={{ backgroundColor: 'white', borderBottom: '1px solid #E2E8F0', padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
-          <svg width="24" height="24" viewBox="0 0 28 28" fill="none">
-            <rect width="28" height="28" rx="6" fill="#1D4ED8"/>
-            <rect x="6" y="9" width="16" height="2.5" rx="1.25" fill="white"/>
-            <rect x="6" y="14" width="16" height="2.5" rx="1.25" fill="white"/>
-            <rect x="6" y="19" width="10" height="2.5" rx="1.25" fill="white"/>
-          </svg>
-          <span style={{ fontFamily: "'Poppins', system-ui", fontWeight: 700, fontSize: 16, color: '#0F172A' }}>myprintingworld</span>
-        </Link>
-        <Link to="/cart" style={{ fontSize: 13, color: '#64748B', fontFamily: 'system-ui', textDecoration: 'none' }}>← Back to cart</Link>
-      </div>
-
       {/* Progress */}
       <div style={{ backgroundColor: 'white', borderBottom: '1px solid #E2E8F0', padding: '16px 24px' }}>
         <div style={{ maxWidth: 500, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -135,7 +139,7 @@ export function CheckoutPage() {
               </div>
               <button onClick={() => setStep('payment')} disabled={!deliveryValid} style={{
                 marginTop: 20, width: '100%', backgroundColor: '#1D4ED8', color: 'white',
-                border: 'none', borderRadius: 8, padding: '13px', fontSize: 14, fontWeight: 700,
+                border: 'none', borderRadius: 12, padding: '13px', fontSize: 14, fontWeight: 700,
                 fontFamily: 'system-ui', cursor: deliveryValid ? 'pointer' : 'not-allowed', opacity: deliveryValid ? 1 : 0.5,
               }}>
                 Continue to Payment →
@@ -149,19 +153,19 @@ export function CheckoutPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {PAYMENT_METHODS.map(m => (
                   <label key={m.id} style={{
-                    display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderRadius: 10,
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderRadius: 12,
                     border: `2px solid ${payment === m.id ? '#1D4ED8' : '#E2E8F0'}`,
                     cursor: 'pointer', backgroundColor: payment === m.id ? '#EFF6FF' : 'white',
                   }}>
                     <input type="radio" name="payment" value={m.id} checked={payment === m.id} onChange={() => setPayment(m.id)} style={{ accentColor: '#1D4ED8', width: 16, height: 16 }} />
-                    <span style={{ fontSize: 18, lineHeight: 1 }}>{m.icon}</span>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: '#0F172A', fontFamily: 'system-ui' }}>{m.label}</span>
+                    <span style={{ lineHeight: 1, display: 'flex' }}>{PAYMENT_ICONS[m.id]}</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#0F172A', fontFamily: "'Poppins', system-ui" }}>{m.label}</span>
                   </label>
                 ))}
               </div>
               <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-                <button onClick={() => setStep('delivery')} style={{ flex: 1, backgroundColor: 'white', color: '#64748B', border: '1.5px solid #E2E8F0', borderRadius: 8, padding: '12px', fontSize: 14, fontWeight: 600, fontFamily: 'system-ui', cursor: 'pointer' }}>← Back</button>
-                <button onClick={() => setStep('review')} style={{ flex: 2, backgroundColor: '#1D4ED8', color: 'white', border: 'none', borderRadius: 8, padding: '12px', fontSize: 14, fontWeight: 700, fontFamily: 'system-ui', cursor: 'pointer' }}>Review Order →</button>
+                <button onClick={() => setStep('delivery')} style={{ flex: 1, backgroundColor: 'white', color: '#64748B', border: '1.5px solid #E2E8F0', borderRadius: 12, padding: '12px', fontSize: 14, fontWeight: 600, fontFamily: 'system-ui', cursor: 'pointer' }}>← Back</button>
+                <button onClick={() => setStep('review')} style={{ flex: 2, backgroundColor: '#1D4ED8', color: 'white', border: 'none', borderRadius: 12, padding: '12px', fontSize: 14, fontWeight: 700, fontFamily: 'system-ui', cursor: 'pointer' }}>Review Order →</button>
               </div>
             </div>
           )}
@@ -184,8 +188,9 @@ export function CheckoutPage() {
                   <h2 style={{ fontFamily: "'Poppins', system-ui", fontWeight: 700, fontSize: 15, color: '#0F172A', margin: 0 }}>Payment</h2>
                   <button onClick={() => setStep('payment')} style={{ fontSize: 12, color: '#1D4ED8', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'system-ui', fontWeight: 600 }}>Edit</button>
                 </div>
-                <p style={{ fontSize: 14, color: '#334155', fontFamily: 'system-ui', margin: '10px 0 0' }}>
-                  {PAYMENT_METHODS.find(m => m.id === payment)?.icon} {PAYMENT_METHODS.find(m => m.id === payment)?.label}
+                <p style={{ fontSize: 14, color: '#334155', fontFamily: "'Poppins', system-ui", margin: '10px 0 0', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ display: 'flex' }}>{PAYMENT_ICONS[payment]}</span>
+                  {PAYMENT_METHODS.find(m => m.id === payment)?.label}
                 </p>
               </div>
               <div style={{ backgroundColor: 'white', borderRadius: 12, border: '1px solid #E2E8F0', padding: '20px' }}>
@@ -201,10 +206,10 @@ export function CheckoutPage() {
                 ))}
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
-                <button onClick={() => setStep('payment')} style={{ flex: 1, backgroundColor: 'white', color: '#64748B', border: '1.5px solid #E2E8F0', borderRadius: 8, padding: '12px', fontSize: 14, fontWeight: 600, fontFamily: 'system-ui', cursor: 'pointer' }}>← Back</button>
+                <button onClick={() => setStep('payment')} style={{ flex: 1, backgroundColor: 'white', color: '#64748B', border: '1.5px solid #E2E8F0', borderRadius: 12, padding: '12px', fontSize: 14, fontWeight: 600, fontFamily: 'system-ui', cursor: 'pointer' }}>← Back</button>
                 <button onClick={handlePlaceOrder} disabled={placing} style={{
                   flex: 2, backgroundColor: placing ? '#64748B' : '#1D4ED8', color: 'white', border: 'none',
-                  borderRadius: 8, padding: '14px', fontSize: 15, fontWeight: 700, fontFamily: 'system-ui', cursor: placing ? 'not-allowed' : 'pointer',
+                  borderRadius: 12, padding: '14px', fontSize: 15, fontWeight: 700, fontFamily: 'system-ui', cursor: placing ? 'not-allowed' : 'pointer',
                 }}>
                   {placing ? 'Placing order…' : `Place Order · AED ${total}`}
                 </button>

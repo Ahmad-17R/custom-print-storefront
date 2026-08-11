@@ -188,8 +188,8 @@ export function SignupPage() {
 
   const inp = {
     width: '100%', boxSizing: 'border-box' as const,
-    padding: '12px 14px', border: '1.5px solid #E2E8F0',
-    borderRadius: 10, fontSize: 15, fontFamily: 'system-ui, sans-serif',
+    padding: '12px 16px', border: '1.5px solid #E2E8F0',
+    borderRadius: 12, fontSize: 14, fontFamily: "'Poppins', system-ui, sans-serif",
     color: '#0F172A', backgroundColor: '#F8FAFC', outline: 'none',
     transition: 'border-color 0.15s ease',
   }
@@ -231,7 +231,7 @@ export function SignupPage() {
 
           {error && (
             <div style={{
-              backgroundColor: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10,
+              backgroundColor: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 12,
               padding: '12px 14px', marginBottom: 20,
               display: 'flex', gap: 10, alignItems: 'flex-start',
             }}>
@@ -249,7 +249,7 @@ export function SignupPage() {
               onClick={handleGoogle} disabled={googleLoading || appleLoading || loading}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                gap: 8, padding: '12px 16px', borderRadius: 10, cursor: 'pointer',
+                gap: 8, padding: '12px 16px', borderRadius: 12, cursor: 'pointer',
                 backgroundColor: 'white', border: '1.5px solid #E2E8F0',
                 fontSize: 14, fontWeight: 600, color: '#0F172A',
                 fontFamily: 'system-ui, sans-serif', transition: 'border-color 0.15s ease',
@@ -266,7 +266,7 @@ export function SignupPage() {
               onClick={handleApple} disabled={appleLoading || googleLoading || loading}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                gap: 8, padding: '12px 16px', borderRadius: 10, cursor: 'pointer',
+                gap: 8, padding: '12px 16px', borderRadius: 12, cursor: 'pointer',
                 backgroundColor: '#0F172A', border: '1.5px solid #0F172A',
                 fontSize: 14, fontWeight: 600, color: 'white',
                 fontFamily: 'system-ui, sans-serif', transition: 'background-color 0.15s ease',
@@ -378,10 +378,10 @@ export function SignupPage() {
               style={{
                 width: '100%', backgroundColor: !agreed ? '#E2E8F0' : '#1D4ED8',
                 color: !agreed ? '#A8A29E' : 'white',
-                border: 'none', borderRadius: 10, padding: '13px 16px',
+                border: 'none', borderRadius: 12, padding: '13px 16px',
                 fontSize: 15, fontWeight: 700,
                 cursor: loading || !agreed ? 'not-allowed' : 'pointer',
-                fontFamily: 'system-ui, sans-serif',
+                fontFamily: "'Poppins', system-ui, sans-serif",
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                 opacity: loading ? 0.75 : 1, marginTop: 4,
                 transition: 'background-color 0.2s ease, color 0.2s ease',

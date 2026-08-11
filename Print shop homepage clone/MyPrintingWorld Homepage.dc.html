@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+  body { margin:0; background: oklch(0.985 0.004 250); font-family: Helvetica, Arial, sans-serif; color: #16253d; }
+  a { color: oklch(0.5 0.1 220); text-decoration: none; }
+  a:hover { color: oklch(0.4 0.12 220); text-decoration: underline; }
+  * { box-sizing: border-box; }
+</style>
+<script src="./image-slot.js"></script>
+</helmet>
+<div style="max-width:1440px;margin:0 auto;background:#fff;">
+
+  <div style="background:#16253d;color:#fff;font-size:12px;padding:8px 24px;display:flex;align-items:center;justify-content:center;gap:16px;position:relative;">
+    <span>You are viewing the U.S. website. For a better experience, we suggest browsing the site for your region.</span>
+    <select style="font-size:12px;padding:4px 8px;">
+      <option>United States</option>
+    </select>
+    <button style="background:#fff;color:#16253d;border:none;padding:6px 14px;font-size:12px;border-radius:2px;cursor:pointer;">Continue</button>
+    <span style="position:absolute;right:24px;cursor:pointer;">✕</span>
+  </div>
+
+  <div style="border-bottom:1px solid #eee;padding:6px 24px;display:flex;gap:24px;font-size:12px;color:#555;">
+    <a href="#">Websites by MyPrintingWorld x Wix</a>
+    <a href="#">Corporate Pricing</a>
+    <a href="#">CreateStudio</a>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:24px;padding:16px 24px;">
+    <div style="font-size:24px;font-weight:700;letter-spacing:-0.5px;flex-shrink:0;">
+      <span style="color:oklch(0.5 0.14 220);">My</span>Printing<span style="color:oklch(0.5 0.14 220);">World</span>
+    </div>
+    <div style="flex:1;display:flex;">
+      <input type="text" placeholder="Search" style="flex:1;border:1px solid #ccc;border-right:none;padding:10px 14px;border-radius:4px 0 0 4px;font-size:14px;" />
+      <button style="background:#f2f2f2;border:1px solid #ccc;border-radius:0 4px 4px 0;padding:0 16px;cursor:pointer;">🔍</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:24px;font-size:12px;white-space:nowrap;">
+      <div>Help is here<br /><strong>1.866.207.4955</strong></div>
+      <div>♡ My Favorites</div>
+      <button style="background:oklch(0.5 0.14 220);color:#fff;border:none;padding:8px 16px;border-radius:4px;font-size:13px;display:flex;align-items:center;gap:6px;cursor:pointer;">👤 Sign In</button>
+      <div style="position:relative;">🛍 Cart<span style="position:absolute;top:-8px;right:-10px;background:oklch(0.5 0.14 220);color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;display:flex;align-items:center;justify-content:center;">1</span></div>
+    </div>
+  </div>
+
+  <div style="padding:0 24px 14px;display:flex;gap:22px;font-size:14px;border-bottom:1px solid #eee;">
+    <sc-for list="{{ navLinks }}" as="link" hint-placeholder-count="12">
+      <a href="#" style="color: {{ link.accent }};font-weight:500;">{{ link.label }}</a>
+    </sc-for>
+  </div>
+
+  <div style="background:#16253d;color:#fff;padding:10px 24px;font-size:13px;display:flex;align-items:center;justify-content:space-between;">
+    <div><strong>Buy More, Save More: $60 off orders $200+ | Code: MPWSAVE</strong> | Ends Aug 12 | <a href="#" style="color:#fff;text-decoration:underline;">Offer details</a> | <a href="#" style="color:#fff;text-decoration:underline;">Save now</a></div>
+    <span>›</span>
+  </div>
+
+  <div style="position:relative;padding:24px;">
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px;height:340px;">
+      <sc-for list="{{ heroImages }}" as="img" hint-placeholder-count="6">
+        <image-slot id="{{ img.id }}" shape="rect" placeholder="{{ img.placeholder }}" style="width:100%;height:100%;"></image-slot>
+      </sc-for>
+    </div>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#16253d;color:#fff;width:520px;padding:36px 40px;text-align:center;border-radius:2px;">
+      <h1 style="font-size:26px;font-weight:600;margin:0 0 14px;">If you need it, we print it.</h1>
+      <p style="font-size:14px;line-height:1.6;margin:0 0 20px;opacity:0.9;">From custom-printed business products to beautiful photo gifts, we've got the product for you. Plus, with our easy-to-use design tools and services, you get exactly what you want.</p>
+      <p style="font-size:14px;margin:0 0 20px;">Try our top products starting at just $10 each</p>
+      <div style="display:flex;gap:10px;justify-content:center;">
+        <button style="background:#fff;color:#16253d;border:none;padding:10px 20px;font-size:13px;border-radius:4px;cursor:pointer;">Try for $10</button>
+        <button style="background:transparent;color:#fff;border:1px solid #fff;padding:10px 20px;font-size:13px;border-radius:4px;cursor:pointer;">Bestselling Products</button>
+        <button style="background:transparent;color:#fff;border:1px solid #fff;padding:10px 20px;font-size:13px;border-radius:4px;cursor:pointer;">Services</button>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:space-around;padding:20px 24px;border-top:1px solid #eee;border-bottom:1px solid #eee;">
+    <sc-for list="{{ trustItems }}" as="t" hint-placeholder-count="3">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="font-size:22px;">{{ t.icon }}</div>
+        <div>
+          <div style="font-size:14px;font-weight:600;">{{ t.title }}</div>
+          <div style="font-size:12px;color:#666;">{{ t.sub }}</div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+
+  <section style="padding:32px 24px 8px;">
+    <h2 style="font-size:20px;font-weight:600;margin:0 0 16px;">Explore all categories</h2>
+    <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:14px;">
+      <sc-for list="{{ categories }}" as="c" hint-placeholder-count="8">
+        <a href="#" style="text-decoration:none;color:#16253d;">
+          <image-slot id="{{ c.id }}" shape="rounded" radius="4" placeholder="{{ c.name }}" style="width:100%;height:140px;background:#f2efe8;"></image-slot>
+          <div style="font-size:13px;margin-top:8px;line-height:1.3;">{{ c.name }}</div>
+        </a>
+      </sc-for>
+    </div>
+  </section>
+
+  <section style="padding:32px 24px 8px;">
+    <h2 style="font-size:20px;font-weight:600;margin:0 0 16px;">Your recently viewed items</h2>
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:14px;">
+      <sc-for list="{{ recentItems }}" as="r" hint-placeholder-count="6">
+        <div>
+          <div style="position:relative;">
+            <image-slot id="{{ r.id }}" shape="rounded" radius="4" placeholder="{{ r.name }}" style="width:100%;height:170px;background:#fafafa;"></image-slot>
+            <span style="position:absolute;top:8px;right:8px;font-size:16px;">♡</span>
+          </div>
+          <div style="font-size:13px;font-weight:600;margin-top:10px;">{{ r.name }}</div>
+          <div style="font-size:13px;margin-top:2px;">{{ r.price }}</div>
+          <div style="font-size:11px;color:#666;">{{ r.sub }}</div>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <section style="padding:32px 24px 8px;">
+    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:16px;">
+      <h2 style="font-size:20px;font-weight:600;margin:0;">Shop by collection</h2>
+      <a href="#" style="font-size:13px;">See all collections →</a>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:14px;">
+      <sc-for list="{{ collections }}" as="col" hint-placeholder-count="6">
+        <a href="#" style="text-decoration:none;color:#16253d;">
+          <image-slot id="{{ col.id }}" shape="rounded" radius="4" placeholder="{{ col.name }}" style="width:100%;height:150px;"></image-slot>
+          <div style="font-size:13px;margin-top:8px;line-height:1.3;">{{ col.name }}</div>
+        </a>
+      </sc-for>
+    </div>
+  </section>
+
+  <section style="padding:32px 24px 8px;">
+    <h2 style="font-size:20px;font-weight:600;margin:0 0 16px;">Explore even more must-haves</h2>
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:14px;">
+      <sc-for list="{{ mustHaves }}" as="m" hint-placeholder-count="6">
+        <a href="#" style="text-decoration:none;color:#16253d;">
+          <image-slot id="{{ m.id }}" shape="rounded" radius="4" placeholder="{{ m.name }}" style="width:100%;height:150px;background:#f2efe8;"></image-slot>
+          <div style="font-size:13px;margin-top:8px;">{{ m.name }}</div>
+        </a>
+      </sc-for>
+    </div>
+  </section>
+
+  <section style="margin:32px 24px;background:oklch(0.96 0.02 100);border-radius:2px;display:grid;grid-template-columns:1fr 1fr;overflow:hidden;">
+    <div style="padding:48px;display:flex;flex-direction:column;justify-content:center;gap:14px;">
+      <h2 style="font-size:26px;font-weight:600;margin:0;">Postcards that mean business, for less.</h2>
+      <p style="font-size:14px;color:#444;margin:0;line-height:1.6;">Bring your brand to life with postcards that are easy to create and impossible to ignore.</p>
+      <button style="background:#16253d;color:#fff;border:none;padding:12px 22px;font-size:13px;border-radius:4px;width:max-content;cursor:pointer;">Shop postcards</button>
+    </div>
+    <image-slot id="promo-postcards" shape="rect" placeholder="postcard lifestyle shot" style="width:100%;height:100%;"></image-slot>
+  </section>
+
+  <section style="padding:32px 24px 8px;">
+    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:16px;">
+      <h2 style="font-size:20px;font-weight:600;margin:0;">Tools to help build your business</h2>
+      <a href="#" style="font-size:13px;">See all services →</a>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;">
+      <sc-for list="{{ tools }}" as="tool" hint-placeholder-count="5">
+        <a href="#" style="text-decoration:none;color:#16253d;border:1px solid #eee;border-radius:4px;padding:20px;display:flex;flex-direction:column;gap:12px;">
+          <div style="font-size:14px;font-weight:600;">{{ tool.title }}</div>
+          <image-slot id="{{ tool.id }}" shape="rounded" radius="4" placeholder="{{ tool.name }}" style="width:100%;height:110px;"></image-slot>
+          <div style="font-size:12px;color:#666;">{{ tool.name }}</div>
+        </a>
+      </sc-for>
+    </div>
+  </section>
+
+  <section style="padding:32px 24px 8px;">
+    <h2 style="font-size:20px;font-weight:600;margin:0 0 4px;">Made by you, #MadeWithMyPrintingWorld</h2>
+    <p style="font-size:13px;color:#666;margin:0 0 16px;">We love to see your custom creations. Post a photo on social media and add @MyPrintingWorld and #MadeWithMyPrintingWorld for a chance to be featured here.</p>
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:14px;">
+      <sc-for list="{{ gallery }}" as="g" hint-placeholder-count="6">
+        <div>
+          <image-slot id="{{ g.id }}" shape="rect" placeholder="customer photo" style="width:100%;height:150px;"></image-slot>
+          <div style="font-size:11px;color:#666;margin-top:6px;">{{ g.handle }}</div>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <section style="padding:56px 24px;display:grid;grid-template-columns:1fr 1fr;gap:60px;background:oklch(0.985 0.004 250);margin-top:24px;">
+    <div>
+      <h3 style="font-size:18px;font-weight:600;margin:0 0 12px;">MyPrintingWorld: Here for small business since 2004.</h3>
+      <p style="font-size:13px;color:#444;line-height:1.7;margin:0;">For more than 20 years, MyPrintingWorld has helped small business owners, entrepreneurs and dreamers create custom designs and professional marketing. Our online printing services are intended to help you find custom products you need — business cards, promotional marketing and more — to create a look you love.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:20px;">
+      <div>
+        <h4 style="font-size:15px;font-weight:600;margin:0 0 6px;">Easy Design</h4>
+        <p style="font-size:13px;color:#444;line-height:1.6;margin:0;">Our online tools make the process as simple and clear as possible, and we're working to improve your experience all the time.</p>
+      </div>
+      <div>
+        <h4 style="font-size:15px;font-weight:600;margin:0 0 6px;">Make It Match</h4>
+        <p style="font-size:13px;color:#444;line-height:1.6;margin:0;">Our designs can be used across multiple printed products, which makes it easier for you to create consistent, professional marketing.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer style="background:#16253d;color:#cdd5e0;padding:40px 24px;display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:30px;">
+    <div>
+      <div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:10px;">PrintYourPossible</div>
+      <p style="font-size:12px;line-height:1.6;">MyPrintingWorld is here to help every step of the way. <a href="#" style="color:#9db4d4;">Learn more</a></p>
+    </div>
+    <div>
+      <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:10px;">Let Us Help</div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <sc-for list="{{ footerHelp }}" as="f" hint-placeholder-count="5">
+          <a href="#" style="font-size:12px;color:#cdd5e0;">{{ f }}</a>
+        </sc-for>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:10px;">Our Company</div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <sc-for list="{{ footerCompany }}" as="f" hint-placeholder-count="7">
+          <a href="#" style="font-size:12px;color:#cdd5e0;">{{ f }}</a>
+        </sc-for>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:10px;">★ Trustpilot</div>
+      <div style="font-size:12px;">TrustScore 4.5 <span style="color:#9db4d4;">7,349 reviews</span></div>
+      <div style="font-size:11px;color:#9db4d4;margin-top:10px;">Our customers rate us Excellent on Trustpilot</div>
+    </div>
+  </footer>
+
+  <div style="background:#0d1826;color:#9db4d4;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;font-size:11px;flex-wrap:wrap;gap:10px;">
+    <div style="display:flex;gap:16px;flex-wrap:wrap;">
+      <span>1.866.207.4955</span>
+      <a href="#" style="color:#9db4d4;">Home</a>
+      <a href="#" style="color:#9db4d4;">Privacy and Cookie Policy</a>
+      <a href="#" style="color:#9db4d4;">Terms and Conditions</a>
+      <a href="#" style="color:#9db4d4;">Legal Matters</a>
+    </div>
+    <div>© 2004-{{ year }} MyPrintingWorld. All rights reserved.</div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const navRaw = ["Deals","Business Cards","Postcards & Print Advertising","Signs, Banners & Posters","Stickers & Labels","Clothing & Bags","Promotional Products","Packaging","Invitations, Gifts & Stationery","Wedding","Logo, Websites & Social","Design Services"];
+    return {
+      year: new Date().getFullYear(),
+      navLinks: navRaw.map((label,i) => ({ label, accent: i===0 ? 'oklch(0.55 0.18 30)' : '#16253d' })),
+      heroImages: [
+        { id: 'hero-1', placeholder: 'lifestyle shot' },
+        { id: 'hero-2', placeholder: 't-shirt product' },
+        { id: 'hero-3', placeholder: 'mug product' },
+        { id: 'hero-4', placeholder: 'photo gift' },
+        { id: 'hero-5', placeholder: 'coasters' },
+        { id: 'hero-6', placeholder: 'banner display' },
+      ],
+      trustItems: [
+        { icon: '★', title: 'Over 18,000 5-star reviews', sub: 'Rated by Trustpilot users' },
+        { icon: '✎', title: 'Create with confidence', sub: 'Design it yourself, or with help' },
+        { icon: '🚚', title: 'Fast shipping', sub: 'Pick the speed, get it on time' },
+      ],
+      categories: [
+        { id: 'cat-cards', name: 'Business Cards' },
+        { id: 'cat-postcards', name: 'Postcards & Print Advertising' },
+        { id: 'cat-signs', name: 'Signs, Banners & Posters' },
+        { id: 'cat-stickers', name: 'Stickers & Labels' },
+        { id: 'cat-clothing', name: 'Clothing & Bags' },
+        { id: 'cat-promo', name: 'Promotional Products' },
+        { id: 'cat-packaging', name: 'Packaging' },
+        { id: 'cat-booklets', name: 'Booklets, Catalogs & Magazines' },
+      ],
+      recentItems: [
+        { id: 'ri-stickers', name: 'Custom Single Stickers', price: 'From $103.99', sub: '$0.52 each / 200 units' },
+        { id: 'ri-letterhead', name: 'Company Letterhead', price: 'From $149.99', sub: '$0.60 each / 250 units' },
+        { id: 'ri-booklets', name: 'Saddle-Stitch Booklets', price: 'From $5.99', sub: '' },
+        { id: 'ri-wirebound', name: 'Wire-Bound Booklets', price: 'From $41.99', sub: '1 unit' },
+        { id: 'ri-stylus', name: 'Softy Rose Gold Stylus', price: '$0.99 – $2.31 each', sub: 'Minimum quantity 50' },
+        { id: 'ri-pen', name: 'Satin Soft-Touch Ballpoint Pen', price: '$1.09 – $2.43 each', sub: 'Minimum quantity 50' },
+      ],
+      collections: [
+        { id: 'col-top', name: 'Top products, starting at $10' },
+        { id: 'col-events', name: 'Prepare for local & community events' },
+        { id: 'col-parties', name: 'Parties & celebrations' },
+        { id: 'col-team', name: 'Team uniforms & more' },
+        { id: 'col-professional', name: 'Prepare for professional events' },
+        { id: 'col-gifts', name: 'Business gifts & giveaways' },
+      ],
+      mustHaves: [
+        { id: 'mh-marketing', name: 'Marketing Materials' },
+        { id: 'mh-stickers', name: 'Custom Single Stickers' },
+        { id: 'mh-invites', name: 'Invitations & Announcements' },
+        { id: 'mh-yard', name: 'Yard Signs' },
+        { id: 'mh-pens', name: 'Pens' },
+        { id: 'mh-roll', name: 'Roll Labels' },
+      ],
+      tools: [
+        { id: 'tool-logo', title: 'Create your free logo', name: 'Logo design' },
+        { id: 'tool-website', title: 'Build your website', name: 'Custom Business Websites' },
+        { id: 'tool-social', title: 'Design social content', name: 'Social Media' },
+        { id: 'tool-design', title: 'Get design help', name: 'Product Design' },
+        { id: 'tool-corp', title: 'Find tailored solutions', name: 'Corporate Services' },
+      ],
+      gallery: [
+        { id: 'gal-1', handle: '@flowershop_co' },
+        { id: 'gal-2', handle: '@partysparkle' },
+        { id: 'gal-3', handle: '@shimmy_bakes' },
+        { id: 'gal-4', handle: '@chicksandco' },
+        { id: 'gal-5', handle: '@urban_apparel' },
+        { id: 'gal-6', handle: '@curatedbyangie' },
+      ],
+      footerHelp: ["My Account","Shipping","Contact & Support","Ideas & Advice","Accessibility"],
+      footerCompany: ["About Us","Careers","Ambassador Program","For Investors","For Media","Sustainability","Do Not Sell or Share My Info"],
+    };
+  }
+}
+</script>
+</body>
+</html>

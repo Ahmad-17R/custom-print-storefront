@@ -245,3 +245,7 @@ body { overflow-x: hidden; }
     z-index: 100;
   }
 }
+
+.hslider::-webkit-scrollbar { display: none; }
+.hslider { -ms-overflow-style: none; scrollbar-width: none; }
+

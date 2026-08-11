@@ -50,22 +50,11 @@ export function MyOrdersPage() {
 
   return (
     <div style={{ backgroundColor: '#F8FAFC', minHeight: '100vh' }}>
-      {/* Header */}
-      <div style={{ backgroundColor: 'white', borderBottom: '1px solid #E2E8F0', padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
-          <svg width="24" height="24" viewBox="0 0 28 28" fill="none">
-            <rect width="28" height="28" rx="6" fill="#1D4ED8"/>
-            <rect x="6" y="9" width="16" height="2.5" rx="1.25" fill="white"/>
-            <rect x="6" y="14" width="16" height="2.5" rx="1.25" fill="white"/>
-            <rect x="6" y="19" width="10" height="2.5" rx="1.25" fill="white"/>
-          </svg>
-          <span style={{ fontFamily: "'Poppins', system-ui", fontWeight: 700, fontSize: 16, color: '#0F172A' }}>myprintingworld</span>
-        </Link>
-        <Link to="/catalog" style={{ fontSize: 13, color: '#1D4ED8', fontFamily: 'system-ui', textDecoration: 'none', fontWeight: 600 }}>+ New Order</Link>
-      </div>
-
       <div className="stor-orders-wrap" style={{ maxWidth: 760, margin: '0 auto', padding: '36px 24px' }}>
-        <h1 style={{ fontFamily: "'Poppins', system-ui", fontWeight: 800, fontSize: 26, color: '#0F172A', margin: '0 0 24px', letterSpacing: '-0.02em' }}>My Orders</h1>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+          <h1 style={{ fontFamily: "'Poppins', system-ui", fontWeight: 800, fontSize: 26, color: '#0F172A', margin: 0, letterSpacing: '-0.02em' }}>My Orders</h1>
+          <Link to="/catalog" style={{ fontSize: 13, color: '#1D4ED8', fontFamily: "'Poppins', system-ui", textDecoration: 'none', fontWeight: 700, backgroundColor: '#EFF6FF', padding: '8px 16px', borderRadius: 12, border: '1px solid #BFDBFE' }}>+ New Order</Link>
+        </div>
 
         {/* Filter tabs */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 20, backgroundColor: 'white', padding: '6px', borderRadius: 10, border: '1px solid #E2E8F0', width: 'fit-content' }}>
@@ -83,7 +72,10 @@ export function MyOrdersPage() {
 
         {filtered.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px 0', color: '#94A3B8', fontFamily: 'system-ui' }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style={{ marginBottom: 12, opacity: 0.4 }}>
+              <rect x="8" y="4" width="32" height="40" rx="4" stroke="#64748B" strokeWidth="2.5"/>
+              <path d="M16 16h16M16 24h16M16 32h10" stroke="#64748B" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
             <p style={{ fontSize: 15, fontWeight: 600, color: '#64748B' }}>No orders found</p>
             <Link to="/catalog" style={{ fontSize: 13, color: '#1D4ED8', textDecoration: 'none', fontWeight: 600 }}>Browse products →</Link>
           </div>
@@ -113,7 +105,7 @@ export function MyOrdersPage() {
                     <div style={{ fontSize: 16, fontWeight: 800, color: '#0F172A', fontFamily: "'Poppins', system-ui", marginBottom: 10 }}>AED {order.total}</div>
                     <Link to={`/orders/${order.orderNumber}`} style={{
                       fontSize: 12, fontWeight: 600, color: '#1D4ED8', fontFamily: 'system-ui',
-                      textDecoration: 'none', border: '1.5px solid #BFDBFE', borderRadius: 6,
+                      textDecoration: 'none', border: '1.5px solid #BFDBFE', borderRadius: 12,
                       padding: '5px 12px', backgroundColor: '#EFF6FF',
                     }}>
                       View Details
