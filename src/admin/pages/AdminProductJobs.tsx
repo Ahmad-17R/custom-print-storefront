@@ -4,7 +4,6 @@ import { AdminLayout, Btn } from '../components/AdminLayout'
 import { api } from '../../lib/api'
 
 const FONT = "'Poppins', system-ui, sans-serif"
-const DARK = '#0F172A'
 
 interface Supplier { id: string; name: string }
 interface JobStep {

@@ -60,7 +60,6 @@ export function StockPage() {
     const avail = r.qty - r.reservedQty
     const col   = availColor(avail)
     return {
-      ...r,
       product:   r.variant.product.name,
       sku:       r.variant.sku,
       warehouse: r.warehouse.name,

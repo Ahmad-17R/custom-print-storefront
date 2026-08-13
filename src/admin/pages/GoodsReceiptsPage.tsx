@@ -3,7 +3,6 @@ import { AdminLayout, Table, SearchInput, Badge, StatCard, StatGrid } from '../c
 import { api } from '../../lib/api'
 
 const FONT = "'Poppins', system-ui, sans-serif"
-const DARK = '#0F172A'
 
 interface GRItem {
   quantity: number

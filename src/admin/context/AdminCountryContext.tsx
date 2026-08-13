@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { api } from '../../lib/api'
 
-interface Country { id: string; name: string; code: string }
+interface Country { id: string; name: string; code: string; isActive: boolean }
 
 interface AdminCountryCtx {
   country: Country | null
