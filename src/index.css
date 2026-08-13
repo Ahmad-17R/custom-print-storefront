@@ -168,6 +168,85 @@ body {
   margin: 0;
 }
 
+/* ── Product Detail Page ─────────────────────────────────────────────────── */
+.pdp-wrap {
+  padding: 0 44px;
+}
+.pdp-main {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  align-items: start;
+  padding: 24px 0 48px;
+}
+.pdp-panel {
+  position: sticky;
+  top: 80px;
+}
+.pdp-thumbs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.pdp-hscroll {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scrollbar-width: none;
+}
+.pdp-hscroll::-webkit-scrollbar { display: none; }
+.pdp-hscroll-card {
+  flex-shrink: 0;
+  width: 180px;
+  background: #fff;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.pdp-hscroll-card:hover {
+  border-color: #1D4ED8;
+  transform: translateY(-2px);
+}
+.pdp-faq-item {
+  border-bottom: 1px solid #E2E8F0;
+}
+.pdp-faq-btn {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 18px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #0F172A;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'Poppins', system-ui;
+}
+.pdp-faq-body {
+  font-size: 14px;
+  color: #475569;
+  line-height: 1.7;
+  padding-bottom: 16px;
+  font-family: system-ui;
+}
+@media (max-width: 1024px) {
+  .pdp-wrap { padding: 0 28px; }
+  .pdp-main { grid-template-columns: 1fr 360px; gap: 28px; }
+}
+@media (max-width: 768px) {
+  .pdp-wrap { padding: 0 16px; }
+  .pdp-main { grid-template-columns: 1fr; gap: 24px; }
+  .pdp-panel { position: static; }
+  .pdp-hscroll-card { width: 150px; }
+}
+
 h1,
 h2 {
   font-family: var(--heading);
