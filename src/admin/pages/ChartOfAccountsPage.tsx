@@ -1,148 +1,172 @@
-import { useState } from 'react'
-import { AdminLayout, Table, Btn, SearchInput, Badge, StatCard, StatGrid } from '../components/AdminLayout'
+import { useEffect, useState } from 'react'
+import { AdminLayout, Table, SearchInput, Badge } from '../components/AdminLayout'
+import { api } from '../../lib/api'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
 
-type AccType = 'Asset' | 'Liability' | 'Equity' | 'Revenue' | 'Expense'
+type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense'
 
 interface Account {
-  id: string; code: string; name: string; type: AccType
-  balance: number; currency: string; active: boolean; parent?: string
+  id: string
+  code: string
+  name: string
+  type: AccountType
+  isActive: boolean
 }
 
-const typeColor: Record<AccType, string> = {
-  Asset:     '#1D4ED8',
-  Liability: '#EF4444',
-  Equity:    '#8B5CF6',
-  Revenue:   '#10B981',
-  Expense:   '#F59E0B',
+// What each system account code is used for — shown to admin as context
+const ACCOUNT_USAGE: Record<string, string> = {
+  '1001': 'Debited on: walk-in cash sales, expense payments, payroll',
+  '1002': 'Debited on: bank transfer receipts; credited on: bank payments to suppliers',
+  '1003': 'Debited on: POS sales',
+  '1100': 'Debited on: online order delivered; credited on: customer payment received',
+  '1200': 'Debited on: stock received from supplier; credited on: depreciation entries',
+  '2001': 'Credited on: purchase order confirmed; debited on: supplier payment',
+  '2002': 'Credited on: VAT collected from customers (used for FTA filing)',
+  '2003': 'Credited on: payroll processed',
+  '3001': 'Owner capital account',
+  '3002': 'Retained profits carried forward',
+  '4001': 'Credited on: online order delivered',
+  '4002': 'Credited on: POS sale completed',
+  '4003': 'Credited on: walk-in sale completed',
+  '5001': 'Debited on: payroll paid',
+  '5002': 'Debited on: expense claim paid, depreciation',
+  '5003': 'Debited on: purchase order confirmed (cost of goods)',
 }
 
-const SEED: Account[] = [
-  { id: '1', code: '1000', name: 'Cash & Bank',           type: 'Asset',     balance: 485200, currency: 'AED', active: true },
-  { id: '2', code: '1100', name: 'Accounts Receivable',   type: 'Asset',     balance: 48720,  currency: 'AED', active: true },
-  { id: '3', code: '1200', name: 'Inventory',             type: 'Asset',     balance: 123400, currency: 'AED', active: true },
-  { id: '4', code: '1300', name: 'Fixed Assets',          type: 'Asset',     balance: 320000, currency: 'AED', active: true },
-  { id: '5', code: '2000', name: 'Accounts Payable',      type: 'Liability', balance: 62100,  currency: 'AED', active: true },
-  { id: '6', code: '2100', name: 'VAT Payable',           type: 'Liability', balance: 14820,  currency: 'AED', active: true },
-  { id: '7', code: '2200', name: 'Accrued Expenses',      type: 'Liability', balance: 18500,  currency: 'AED', active: true },
-  { id: '8', code: '3000', name: 'Owner Equity',          type: 'Equity',    balance: 500000, currency: 'AED', active: true },
-  { id: '9', code: '3100', name: 'Retained Earnings',     type: 'Equity',    balance: 381900, currency: 'AED', active: true },
-  { id:'10', code: '4000', name: 'Sales Revenue',         type: 'Revenue',   balance: 892100, currency: 'AED', active: true },
-  { id:'11', code: '4100', name: 'Service Revenue',       type: 'Revenue',   balance: 134500, currency: 'AED', active: true },
-  { id:'12', code: '5000', name: 'Cost of Goods Sold',    type: 'Expense',   balance: 421000, currency: 'AED', active: true },
-  { id:'13', code: '5100', name: 'Salaries & Wages',      type: 'Expense',   balance: 199000, currency: 'AED', active: true },
-  { id:'14', code: '5200', name: 'Rent & Utilities',      type: 'Expense',   balance: 84000,  currency: 'AED', active: true },
-  { id:'15', code: '5300', name: 'Marketing & Advertising',type:'Expense',   balance: 42000,  currency: 'AED', active: true },
-  { id:'16', code: '5400', name: 'Depreciation',          type: 'Expense',   balance: 32000,  currency: 'AED', active: true },
-]
+const TYPE_LABEL: Record<AccountType, string> = { asset: 'Asset', liability: 'Liability', equity: 'Equity', revenue: 'Revenue', expense: 'Expense' }
+const TYPE_COLOR: Record<AccountType, string> = { asset: '#1D4ED8', liability: '#EF4444', equity: '#8B5CF6', revenue: '#10B981', expense: '#F59E0B' }
+const TYPES: AccountType[] = ['asset', 'liability', 'equity', 'revenue', 'expense']
 
-const TYPES: AccType[] = ['Asset','Liability','Equity','Revenue','Expense']
-const COLS = [
-  { key: 'code',     label: 'Code',    width: 90 },
-  { key: 'name',     label: 'Account Name' },
-  { key: 'type',     label: 'Type',    width: 110 },
-  { key: 'balance',  label: 'Balance', width: 140 },
-  { key: 'currency', label: 'CCY',     width: 70 },
-  { key: 'active',   label: 'Status',  width: 90 },
-  { key: 'actions',  label: '',        width: 80 },
-]
+const inp: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 13, fontFamily: FONT, boxSizing: 'border-box', outline: 'none' }
 
-function Modal({ acc, onClose, onSave }: { acc: Partial<Account> | null; onClose: () => void; onSave: (a: Partial<Account>) => void }) {
-  const [form, setForm] = useState<Partial<Account>>(acc ?? { code: '', name: '', type: 'Asset', balance: 0, currency: 'AED', active: true })
-  if (!acc) return null
-  const f = <K extends keyof Account>(k: K, v: Account[K]) => setForm(p => ({ ...p, [k]: v }))
+function RenameModal({ acc, onClose, onSaved }: { acc: Account; onClose: () => void; onSaved: () => void }) {
+  const [name, setName]     = useState(acc.name)
+  const [saving, setSaving] = useState(false)
+  const [err, setErr]       = useState('')
+
+  const submit = async () => {
+    if (!name.trim()) { setErr('Name cannot be empty'); return }
+    setSaving(true)
+    try {
+      await api.patch(`/chart-of-accounts/${acc.id}`, { name: name.trim() })
+      onSaved(); onClose()
+    } catch (e: any) {
+      setErr(e?.response?.data?.error || e?.message || 'Failed to save')
+    } finally { setSaving(false) }
+  }
+
+  const usage = ACCOUNT_USAGE[acc.code]
+
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: '#fff', borderRadius: 12, padding: 28, width: 460, fontFamily: FONT }}>
-        <h2 style={{ margin: '0 0 20px', fontSize: 16, fontWeight: 700, color: DARK }}>{form.id ? 'Edit Account' : 'New Account'}</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-          <label>
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 4 }}>Account Code *</span>
-            <input value={form.code ?? ''} onChange={e => f('code', e.target.value)} style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 13, fontFamily: FONT, boxSizing: 'border-box', outline: 'none' }} />
-          </label>
-          <label>
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 4 }}>Type</span>
-            <select value={form.type ?? 'Asset'} onChange={e => f('type', e.target.value as AccType)} style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 13, fontFamily: FONT, outline: 'none' }}>
-              {TYPES.map(t => <option key={t}>{t}</option>)}
-            </select>
-          </label>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ background: '#fff', borderRadius: 14, padding: 28, width: 480, fontFamily: FONT, boxSizing: 'border-box' }}>
+        <div style={{ fontWeight: 700, fontSize: 16, color: DARK, marginBottom: 6 }}>Rename Account</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <code style={{ fontSize: 13, background: '#F1F5F9', padding: '3px 8px', borderRadius: 6, color: '#475569' }}>{acc.code}</code>
+          <Badge label={TYPE_LABEL[acc.type]} color={TYPE_COLOR[acc.type]} />
         </div>
-        <label style={{ display: 'block', marginBottom: 14 }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 4 }}>Account Name *</span>
-          <input value={form.name ?? ''} onChange={e => f('name', e.target.value)} style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 13, fontFamily: FONT, boxSizing: 'border-box', outline: 'none' }} />
-        </label>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
-          <label>
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 4 }}>Opening Balance</span>
-            <input type="number" value={form.balance ?? 0} onChange={e => f('balance', Number(e.target.value))} style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 13, fontFamily: FONT, boxSizing: 'border-box', outline: 'none' }} />
-          </label>
-          <label>
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 4 }}>Currency</span>
-            <select value={form.currency ?? 'AED'} onChange={e => f('currency', e.target.value)} style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 13, fontFamily: FONT, outline: 'none' }}>
-              {['AED','USD','EUR','GBP'].map(c => <option key={c}>{c}</option>)}
-            </select>
-          </label>
+
+        {usage && (
+          <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0369A1', marginBottom: 16 }}>
+            <strong>Used for:</strong> {usage}
+          </div>
+        )}
+
+        <div style={{ marginBottom: 6, fontSize: 12, fontWeight: 600, color: '#64748B' }}>Display Name</div>
+        <input style={{ ...inp, marginBottom: 6 }} value={name} onChange={e => setName(e.target.value)} autoFocus />
+        <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 20 }}>
+          Only the name changes. The account code and type are fixed — the system uses them to route transactions automatically.
         </div>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 24, cursor: 'pointer' }}>
-          <input type="checkbox" checked={form.active ?? true} onChange={e => f('active', e.target.checked)} />
-          <span style={{ fontSize: 13 }}>Active</span>
-        </label>
+
+        {err && <div style={{ background: '#FEF2F2', color: '#B91C1C', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginBottom: 14 }}>{err}</div>}
+
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <Btn label="Cancel" variant="secondary" onClick={onClose} />
-          <Btn label="Save Account" onClick={() => { onSave(form); onClose() }} />
+          <button onClick={onClose} style={{ padding: '8px 18px', borderRadius: 8, border: '1px solid #E2E8F0', background: '#fff', fontFamily: FONT, fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+          <button onClick={submit} disabled={saving} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: DARK, color: '#fff', fontFamily: FONT, fontSize: 13, cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>
+            {saving ? 'Saving…' : 'Rename'}
+          </button>
         </div>
       </div>
     </div>
   )
 }
 
+const COLS = [
+  { key: 'code',    label: 'Code',         width: 80  },
+  { key: 'name',    label: 'Name'                     },
+  { key: 'usage',   label: 'Used For'                 },
+  { key: 'type',    label: 'Type',         width: 110 },
+  { key: 'actions', label: '',             width: 80  },
+]
+
 export function ChartOfAccountsPage() {
-  const [data, setData]   = useState<Account[]>(SEED)
-  const [q, setQ]         = useState('')
-  const [type, setType]   = useState<AccType | 'All'>('All')
-  const [modal, setModal] = useState<Partial<Account> | null>(null)
+  const [data, setData]         = useState<Account[]>([])
+  const [loading, setLoading]   = useState(true)
+  const [q, setQ]               = useState('')
+  const [typeFilter, setFilter] = useState<AccountType | 'all'>('all')
+  const [editing, setEditing]   = useState<Account | null>(null)
+
+  const load = async () => {
+    setLoading(true)
+    try {
+      const res = await api.get<{ data: Account[] }>('/chart-of-accounts?pageSize=500')
+      setData(res.data)
+    } finally { setLoading(false) }
+  }
+  useEffect(() => { load() }, [])
 
   const filtered = data.filter(a =>
-    (type === 'All' || a.type === type) &&
-    (a.name.toLowerCase().includes(q.toLowerCase()) || a.code.includes(q))
+    (typeFilter === 'all' || a.type === typeFilter) &&
+    (a.code.toLowerCase().includes(q.toLowerCase()) || a.name.toLowerCase().includes(q.toLowerCase()))
   )
 
-  const save = (form: Partial<Account>) => {
-    if (form.id) setData(d => d.map(a => a.id === form.id ? { ...a, ...form } as Account : a))
-    else setData(d => [...d, { id: String(d.length + 1), ...form } as Account])
-  }
-
-  const totalAssets     = data.filter(a => a.type === 'Asset').reduce((s,a) => s + a.balance, 0)
-  const totalRevenue    = data.filter(a => a.type === 'Revenue').reduce((s,a) => s + a.balance, 0)
-  const totalExpenses   = data.filter(a => a.type === 'Expense').reduce((s,a) => s + a.balance, 0)
-
   const rows = filtered.map(a => ({
-    ...a,
-    balance: <span style={{ fontVariantNumeric: 'tabular-nums' }}>AED {a.balance.toLocaleString()}</span>,
-    type:    <Badge label={a.type} color={typeColor[a.type]} />,
-    active:  <Badge label={a.active ? 'Active' : 'Inactive'} color={a.active ? '#10B981' : '#64748B'} />,
-    actions: <button onClick={() => setModal(a)} style={{ fontSize: 12, padding: '4px 10px', border: '1px solid #E2E8F0', borderRadius: 6, background: '#fff', cursor: 'pointer', fontFamily: FONT }}>Edit</button>,
+    code:  <code style={{ fontSize: 12, background: '#F1F5F9', padding: '2px 7px', borderRadius: 5, color: '#475569' }}>{a.code}</code>,
+    name:  <span style={{ fontWeight: 600 }}>{a.name}</span>,
+    usage: <span style={{ fontSize: 12, color: '#64748B' }}>{ACCOUNT_USAGE[a.code] ?? '—'}</span>,
+    type:  <Badge label={TYPE_LABEL[a.type]} color={TYPE_COLOR[a.type]} />,
+    actions: (
+      <button onClick={() => setEditing(a)} style={{ fontSize: 12, padding: '4px 10px', border: '1px solid #E2E8F0', borderRadius: 6, background: '#fff', cursor: 'pointer', fontFamily: FONT }}>
+        Rename
+      </button>
+    ),
   }))
 
   return (
-    <AdminLayout title="Chart of Accounts"
-      actions={<div style={{ display: 'flex', gap: 8 }}><SearchInput value={q} onChange={setQ} placeholder="Search accounts…" /><Btn label="+ New Account" onClick={() => setModal({})} /></div>}>
-      <StatGrid>
-        <StatCard label="Total Assets"    value={`AED ${totalAssets.toLocaleString()}`}   sub="Asset accounts"   color="#1D4ED8" />
-        <StatCard label="Total Revenue"   value={`AED ${totalRevenue.toLocaleString()}`}  sub="Revenue accounts" color="#10B981" />
-        <StatCard label="Total Expenses"  value={`AED ${totalExpenses.toLocaleString()}`} sub="Expense accounts" color="#F59E0B" />
-        <StatCard label="Net Profit"      value={`AED ${(totalRevenue - totalExpenses).toLocaleString()}`} sub="Revenue − Expenses" color={totalRevenue > totalExpenses ? '#10B981' : '#EF4444'} />
-      </StatGrid>
+    <AdminLayout title="Chart of Accounts" actions={
+      <div style={{ display: 'flex', gap: 8 }}>
+        <SearchInput value={q} onChange={setQ} placeholder="Search code or name…" />
+      </div>
+    }>
+      {/* Info banner */}
+      <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 10, padding: '12px 16px', marginBottom: 20, fontFamily: FONT, fontSize: 13, color: '#0369A1' }}>
+        These accounts are <strong>fixed by the system</strong> and automatically receive journal entries on every transaction. You can rename them to match your preferred terminology, but the codes and types cannot be changed.
+      </div>
+
+      {/* Type filter tabs */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
-        {(['All',...TYPES] as const).map(t => (
-          <button key={t} onClick={() => setType(t)} style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontFamily: FONT, fontWeight: 500, cursor: 'pointer', border: '1px solid #E2E8F0', background: type===t ? DARK : '#fff', color: type===t ? '#fff' : '#64748B' }}>{t}</button>
+        {(['all', ...TYPES] as const).map(t => (
+          <button key={t} onClick={() => setFilter(t)} style={{
+            padding: '5px 12px', borderRadius: 20, fontSize: 12, fontFamily: FONT, fontWeight: 500, cursor: 'pointer',
+            border: '1px solid #E2E8F0',
+            background: typeFilter === t ? DARK : '#fff',
+            color: typeFilter === t ? '#fff' : '#64748B',
+          }}>
+            {t === 'all' ? `All (${data.length})` : `${TYPE_LABEL[t]} (${data.filter(a => a.type === t).length})`}
+          </button>
         ))}
       </div>
-      <div style={{ fontSize: 13, color: '#64748B', marginBottom: 12 }}>{filtered.length} accounts</div>
-      <Table columns={COLS} rows={rows} />
-      {modal !== null && <Modal acc={modal} onClose={() => setModal(null)} onSave={save} />}
+
+      {loading
+        ? <div style={{ padding: 40, textAlign: 'center', color: '#94A3B8', fontFamily: FONT }}>Loading…</div>
+        : data.length === 0
+          ? <div style={{ padding: 60, textAlign: 'center', color: '#94A3B8', fontFamily: FONT }}>No accounts found. Run the seed script on the server to create system accounts.</div>
+          : <Table columns={COLS} rows={rows} />
+      }
+
+      {editing && <RenameModal acc={editing} onClose={() => setEditing(null)} onSaved={load} />}
     </AdminLayout>
   )
 }

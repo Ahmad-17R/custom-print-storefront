@@ -1,11 +1,25 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../../context/CartContext'
+import { CATALOG_PRODUCTS } from './CatalogPage'
 
 export function CartPage() {
-  const { items, removeItem, updateQty, total } = useCart()
+  const { items, removeItem, updateQty, total, addItem } = useCart()
+  const navigate = useNavigate()
 
   const vat      = Math.round(total * 0.05)
   const grandTotal = total + vat
+
+  // "More things you may like" — products from the same categories as what's in the cart
+  const cartSlugs = new Set(items.map(i => i.slug))
+  const cartCategories = new Set(
+    items.map(i => CATALOG_PRODUCTS.find(p => p.slug === i.slug)?.category).filter(Boolean)
+  )
+  let suggestions = CATALOG_PRODUCTS.filter(p => cartCategories.has(p.category) && !cartSlugs.has(p.slug))
+  if (suggestions.length < 4) {
+    // top up with other popular products if the category is thin
+    suggestions = [...suggestions, ...CATALOG_PRODUCTS.filter(p => !cartSlugs.has(p.slug) && !suggestions.includes(p))]
+  }
+  suggestions = suggestions.slice(0, 4)
 
   if (items.length === 0) {
     return (
@@ -74,6 +88,11 @@ export function CartPage() {
                       AED {item.unitPrice * item.qty}
                     </span>
                   </div>
+                  {/* Edit links */}
+                  <div style={{ display: 'flex', gap: 16, marginTop: 10 }}>
+                    <button onClick={() => navigate(`/products/${item.slug}`)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#1D4ED8', fontFamily: 'system-ui', textDecoration: 'underline' }}>Edit design</button>
+                    <button onClick={() => navigate(`/products/${item.slug}`)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#64748B', fontFamily: 'system-ui', textDecoration: 'underline' }}>Edit options</button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -133,6 +152,32 @@ export function CartPage() {
             </div>
           </div>
         </div>
+
+        {/* More things you may like — same-category suggestions */}
+        {suggestions.length > 0 && (
+          <div style={{ marginTop: 48 }}>
+            <h2 style={{ fontFamily: "'Poppins', system-ui", fontWeight: 800, fontSize: 22, color: '#0F172A', margin: '0 0 20px' }}>More things you may like</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 20 }}>
+              {suggestions.map(p => (
+                <div key={p.slug} style={{ backgroundColor: 'white', borderRadius: 14, border: '1px solid #E2E8F0', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                  <div onClick={() => navigate(`/products/${p.slug}`)} style={{ cursor: 'pointer' }}>
+                    <img src={p.image} alt={p.name} style={{ width: '100%', height: 160, objectFit: 'cover' }} onError={e => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />
+                  </div>
+                  <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+                    <div onClick={() => navigate(`/products/${p.slug}`)} style={{ cursor: 'pointer', fontSize: 14, fontWeight: 700, color: '#0F172A', fontFamily: 'system-ui', marginBottom: 4 }}>{p.name}</div>
+                    <div style={{ fontSize: 13, color: '#64748B', fontFamily: 'system-ui', marginBottom: 12 }}>From AED {p.basePrice}</div>
+                    <div style={{ flex: 1 }} />
+                    <button
+                      onClick={() => addItem({ id: `${p.slug}::${Date.now()}`, slug: p.slug, name: p.name, image: p.image, options: [], qty: 1, unitPrice: p.basePrice })}
+                      style={{ width: '100%', padding: '10px 0', borderRadius: 8, border: 'none', backgroundColor: '#EFF6FF', color: '#1D4ED8', fontSize: 13, fontWeight: 700, fontFamily: 'system-ui', cursor: 'pointer' }}>
+                      Add to cart
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

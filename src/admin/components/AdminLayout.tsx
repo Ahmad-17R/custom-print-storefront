@@ -1,6 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAdminCountry } from '../context/AdminCountryContext'
+import { useAuth } from '../lib/AuthContext'
+import { AccountSettingsModal } from './AccountSettingsModal'
+import type { AuthEmployee } from '../../lib/api'
+
+const pageKey = (href: string) => href.replace('/admin/', '')
+
+// Whether a user may see a page. Owner sees all. A user with a POS counter assigned
+// automatically gets the POS Terminal even without the explicit page right.
+function canSeePage(user: AuthEmployee | null, can: (k: string) => boolean, key: string): boolean {
+  if (!user) return false
+  if (key === 'my-jobs') return !user.isOwner                         // personal worker screen — not for the owner
+  if (can(key)) return true
+  if (key === 'pos/terminal' && !!user.posRegisterId) return true
+  return false
+}
 
 function useIsMobile() {
   const [mobile, setMobile] = useState(() => window.innerWidth < 768)
@@ -32,6 +47,8 @@ const IC: Record<string, React.ReactNode> = {
   finance:   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>,
   projects:  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>,
   system:    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>,
+  portal:    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
+  analytics: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
   chevron:   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>,
   bell:      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>,
   user:      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
@@ -55,6 +72,7 @@ const NAV_GROUPS = [
     id: 'orders', label: 'Orders', icon: 'orders',
     items: [
       { label: 'All Orders',      href: '/admin/orders' },
+      { label: 'Order Handling',  href: '/admin/online-order-handling' },
       { label: 'Quotations',      href: '/admin/quotations' },
       { label: 'Sales Orders',    href: '/admin/sales-orders' },
       { label: 'Sales Invoices',  href: '/admin/sales-invoices' },
@@ -66,7 +84,9 @@ const NAV_GROUPS = [
   {
     id: 'inventory', label: 'Inventory', icon: 'inventory',
     items: [
+      { label: 'Materials',       href: '/admin/materials' },
       { label: 'Stock Levels',    href: '/admin/stock' },
+      { label: 'Stock In',        href: '/admin/stock-in' },
       { label: 'Warehouses',      href: '/admin/warehouses' },
       { label: 'Adjustments',     href: '/admin/stock-adjustments' },
       { label: 'Transfers',       href: '/admin/stock-transfers' },
@@ -78,29 +98,28 @@ const NAV_GROUPS = [
     id: 'purchase', label: 'Procurement', icon: 'purchase',
     items: [
       { label: 'Suppliers',         href: '/admin/suppliers' },
-      { label: 'Requisitions',      href: '/admin/requisitions' },
+      { label: 'Requisitions',      href: '/admin/purchase-requisitions' },
       { label: 'RFQs',              href: '/admin/rfqs' },
       { label: 'Purchase Orders',   href: '/admin/purchase-orders' },
       { label: 'Goods Receipts',    href: '/admin/goods-receipts' },
       { label: 'Purchase Returns',  href: '/admin/purchase-returns' },
+      { label: 'Analytics',         href: '/admin/procurement-analytics' },
     ],
   },
   {
     id: 'sales', label: 'Sales & CRM', icon: 'sales',
     items: [
-      { label: 'Leads',         href: '/admin/leads' },
-      { label: 'Opportunities', href: '/admin/opportunities' },
-      { label: 'Price Lists',   href: '/admin/price-lists' },
-      { label: 'Promotions',    href: '/admin/promotions' },
-      { label: 'Commissions',   href: '/admin/commissions' },
+      { label: 'Customers',     href: '/admin/walk-in-customers' },
+      { label: 'Walk-in Sales', href: '/admin/walk-in-sales' },
+      { label: 'Order Handling', href: '/admin/order-handling' },
+      { label: 'Order Summary', href: '/admin/order-summary' },
     ],
   },
   {
     id: 'pos', label: 'Point of Sale', icon: 'pos',
     items: [
-      { label: 'Registers',   href: '/admin/pos/registers' },
-      { label: 'Sessions',    href: '/admin/pos/sessions' },
-      { label: 'POS Orders',  href: '/admin/pos/orders' },
+      { label: '🖥️ Open Terminal', href: '/admin/pos/terminal' },
+      { label: 'Registers',        href: '/admin/pos/registers' },
     ],
   },
   {
@@ -115,25 +134,31 @@ const NAV_GROUPS = [
   {
     id: 'hr', label: 'HR & Payroll', icon: 'hr',
     items: [
-      { label: 'Employees',      href: '/admin/employees' },
-      { label: 'Attendance',     href: '/admin/attendance' },
-      { label: 'Leave Requests', href: '/admin/leave' },
-      { label: 'Payroll Runs',   href: '/admin/payroll' },
-      { label: 'Applicants',     href: '/admin/applicants' },
-      { label: 'Appraisals',     href: '/admin/appraisals' },
+      { label: 'Employees',         href: '/admin/employees' },
+      { label: 'Departments',       href: '/admin/departments' },
+      { label: 'Attendance',        href: '/admin/attendance' },
+      { label: 'Leave Requests',    href: '/admin/leave' },
+      { label: 'Payroll Runs',      href: '/admin/payroll' },
+      { label: 'Applicants',        href: '/admin/applicants' },
+      { label: 'Appraisals',        href: '/admin/appraisals' },
+      { label: 'Work Shifts',       href: '/admin/shifts' },
+      { label: 'Deduction Rules',   href: '/admin/deduction-rules' },
+      { label: 'Employee Advances', href: '/admin/advances' },
     ],
   },
   {
     id: 'finance', label: 'Finance', icon: 'finance',
     items: [
-      { label: 'Chart of Accounts',  href: '/admin/accounts' },
-      { label: 'Journal Entries',    href: '/admin/journals' },
-      { label: 'Bank Accounts',      href: '/admin/bank-accounts' },
-      { label: 'Tax Rates',          href: '/admin/tax-rates' },
-      { label: 'Fiscal Periods',     href: '/admin/fiscal-periods' },
-      { label: 'Budgets',            href: '/admin/budgets' },
-      { label: 'Fixed Assets',       href: '/admin/assets' },
-      { label: 'Expense Claims',     href: '/admin/expenses' },
+      { label: 'Financial Reports',    href: '/admin/reports' },
+      { label: 'Chart of Accounts',   href: '/admin/accounts' },
+      { label: 'Journal Entries',     href: '/admin/journals' },
+      { label: 'Bank Accounts',       href: '/admin/bank-accounts' },
+      { label: 'Tax Rates',           href: '/admin/tax-rates' },
+      { label: 'Fiscal Periods',      href: '/admin/fiscal-periods' },
+      { label: 'Budgets',             href: '/admin/budgets' },
+      { label: 'Fixed Assets',        href: '/admin/assets' },
+      { label: 'Expense Claims',      href: '/admin/expenses' },
+      { label: 'Tax Filings',         href: '/admin/tax-filings' },
     ],
   },
   {
@@ -147,6 +172,8 @@ const NAV_GROUPS = [
     id: 'system', label: 'System', icon: 'system',
     items: [
       { label: 'Users & Roles',     href: '/admin/users' },
+      { label: 'Countries',         href: '/admin/countries' },
+      { label: 'Customers',         href: '/admin/customers' },
       { label: 'Audit Trail',       href: '/admin/audit' },
       { label: 'Webhooks',          href: '/admin/webhooks' },
       { label: 'Email Templates',   href: '/admin/email-templates' },
@@ -154,13 +181,28 @@ const NAV_GROUPS = [
       { label: 'Company Settings',  href: '/admin/settings' },
     ],
   },
+  {
+    id: 'analytics', label: 'Analytics & Reports', icon: 'analytics',
+    items: [
+      { label: 'KPI Scorecards',       href: '/admin/kpi' },
+      { label: 'Scheduled Reports',    href: '/admin/scheduled-reports' },
+    ],
+  },
 ]
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 function Sidebar({ collapsed, setCollapsed, onClose }: { collapsed: boolean; setCollapsed: (v: boolean) => void; onClose?: () => void }) {
   const { pathname } = useLocation()
-  const activeGroup = NAV_GROUPS.find(g => g.items.some(i => pathname.startsWith(i.href)))?.id
-  const [openGroups, setOpenGroups] = useState<string[]>(activeGroup ? [activeGroup] : ['catalog'])
+  const { user, can, logout } = useAuth()
+
+  // Show only the pages this user was granted (owner sees everything; counter → terminal)
+  const groups = NAV_GROUPS
+    .map(g => ({ ...g, items: g.items.filter(i => canSeePage(user, can, pageKey(i.href))) }))
+    .filter(g => g.items.length > 0)
+
+  const activeGroup = groups.find(g => g.items.some(i => pathname.startsWith(i.href)))?.id
+  const [openGroups, setOpenGroups] = useState<string[]>(activeGroup ? [activeGroup] : [groups[0]?.id ?? ''])
+  const [showAccount, setShowAccount] = useState(false)
 
   const toggle = (id: string) =>
     setOpenGroups(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
@@ -169,7 +211,7 @@ function Sidebar({ collapsed, setCollapsed, onClose }: { collapsed: boolean; set
     <div style={{
       width: collapsed ? 56 : 240,
       background: DARK,
-      minHeight: '100vh',
+      height: '100%',
       display: 'flex',
       flexDirection: 'column',
       flexShrink: 0,
@@ -189,7 +231,8 @@ function Sidebar({ collapsed, setCollapsed, onClose }: { collapsed: boolean; set
         {!collapsed && <span style={{ fontFamily: font, fontWeight: 700, fontSize: 14, color: '#F8FAFC', whiteSpace: 'nowrap' }}>MyPrintingWorld</span>}
       </div>
 
-      {/* Dashboard link */}
+      {/* Dashboard link — only if granted */}
+      {can('dashboard') && (
       <div style={{ padding: collapsed ? '8px 0' : '8px', borderBottom: `1px solid ${DARK2}` }}>
         <Link to="/admin" style={{ textDecoration: 'none' }} onClick={onClose}>
           <div style={{
@@ -205,10 +248,23 @@ function Sidebar({ collapsed, setCollapsed, onClose }: { collapsed: boolean; set
           </div>
         </Link>
       </div>
+      )}
+
+      {/* My Jobs — personal worker screen (not shown to the owner) */}
+      {!user?.isOwner && (
+      <div style={{ padding: collapsed ? '8px 0' : '8px', borderBottom: `1px solid ${DARK2}` }}>
+        <Link to="/admin/my-jobs" style={{ textDecoration: 'none' }} onClick={onClose}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: collapsed ? '8px 0' : '8px 10px', justifyContent: collapsed ? 'center' : 'flex-start', borderRadius: 8, background: pathname === '/admin/my-jobs' ? DARK2 : 'transparent', color: pathname === '/admin/my-jobs' ? '#fff' : '#94A3B8' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+            {!collapsed && <span style={{ fontSize: 13, fontFamily: font }}>My Jobs</span>}
+          </div>
+        </Link>
+      </div>
+      )}
 
       {/* Nav groups */}
-      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: collapsed ? '8px 0' : '8px' }}>
-        {NAV_GROUPS.map(group => {
+      <div className="admin-nav-scroll" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: collapsed ? '8px 0' : '8px' }}>
+        {groups.map(group => {
           const isOpen = openGroups.includes(group.id)
           const isActive = group.items.some(i => pathname.startsWith(i.href))
           return (
@@ -266,23 +322,31 @@ function Sidebar({ collapsed, setCollapsed, onClose }: { collapsed: boolean; set
         })}
       </div>
 
-      {/* Bottom: back to storefront */}
-      <div style={{ padding: collapsed ? '12px 0' : '12px 8px', borderTop: `1px solid ${DARK2}` }}>
+      {/* Bottom: user + account + logout */}
+      <div style={{ padding: collapsed ? '10px 0' : '10px 8px', borderTop: `1px solid ${DARK2}` }}>
+        {!collapsed && user && (
+          <div style={{ padding: '6px 10px', marginBottom: 4 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#F8FAFC', fontFamily: font, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.name}</div>
+            <div style={{ fontSize: 11, color: user.isOwner ? '#FBBF24' : '#64748B', fontFamily: font }}>{user.isOwner ? 'Owner · Full Access' : (user.jobTitle || user.role)}</div>
+          </div>
+        )}
+        <button onClick={() => setShowAccount(true)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: collapsed ? '8px 0' : '8px 10px', justifyContent: collapsed ? 'center' : 'flex-start', borderRadius: 8, background: 'transparent', border: 'none', color: '#94A3B8', fontSize: 12, fontFamily: font, cursor: 'pointer' }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          {!collapsed && 'My Account'}
+        </button>
+        <button onClick={logout} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: collapsed ? '8px 0' : '8px 10px', justifyContent: collapsed ? 'center' : 'flex-start', borderRadius: 8, background: 'transparent', border: 'none', color: '#F87171', fontSize: 12, fontFamily: font, cursor: 'pointer' }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          {!collapsed && 'Sign Out'}
+        </button>
         <Link to="/" style={{ textDecoration: 'none' }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            padding: collapsed ? '8px 0' : '8px 10px',
-            justifyContent: collapsed ? 'center' : 'flex-start',
-            borderRadius: 8,
-            color: '#64748B',
-            fontSize: 12,
-            fontFamily: font,
-          }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: collapsed ? '8px 0' : '8px 10px', justifyContent: collapsed ? 'center' : 'flex-start', borderRadius: 8, color: '#64748B', fontSize: 12, fontFamily: font }}>
             {IC.home}
             {!collapsed && 'Back to Storefront'}
           </div>
         </Link>
       </div>
+
+      {showAccount && <AccountSettingsModal onClose={() => setShowAccount(false)} />}
     </div>
   )
 }
@@ -362,10 +426,22 @@ export function AdminLayout({ title, actions, children }: {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const overlayRef = useRef<HTMLDivElement>(null)
+  const { user, can } = useAuth()
 
   // close mobile drawer on route change
   const location = useLocation()
   useEffect(() => { setMobileOpen(false) }, [location.pathname])
+
+  // Route guard: block direct-URL access to pages this user wasn't granted.
+  const key = pageKey(location.pathname.replace(/\/$/, ''))
+  const isBase = location.pathname === '/admin' || location.pathname === '/admin/'
+  const allowed = !user ? false : user.isOwner || (
+    isBase
+      ? can('dashboard')                                  // base = dashboard, must be granted
+      : canSeePage(user, can, key) ||                     // exact page (or terminal via counter)
+        canSeePage(user, can, key.split('/')[0]) ||       // sub-route: first segment (products/:id/…)
+        canSeePage(user, can, key.split('/').slice(0, 2).join('/'))  // two-segment (pos/terminal)
+  )
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#F8FAFC', fontFamily: font }}>
@@ -405,7 +481,17 @@ export function AdminLayout({ title, actions, children }: {
           </div>
         )}
         <main style={{ flex: 1, padding: isMobile ? 12 : 24, overflowY: 'auto' }}>
-          {children}
+          {allowed ? children : (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400 }}>
+              <div style={{ textAlign: 'center', maxWidth: 380, fontFamily: font }}>
+                <div style={{ color: '#991B1B', marginBottom: 14 }}>
+                  <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                </div>
+                <div style={{ fontWeight: 700, fontSize: 17, color: '#991B1B', marginBottom: 6 }}>No access to this page</div>
+                <div style={{ fontSize: 13, color: '#64748B', lineHeight: 1.6 }}>You don't have permission to view this page. Ask the owner to grant it from your Rights &amp; Access settings.</div>
+              </div>
+            </div>
+          )}
         </main>
       </div>
     </div>

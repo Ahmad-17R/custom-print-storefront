@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { AdminLayout, Btn } from '../components/AdminLayout'
+import { useEffect, useState } from 'react'
+import { AdminLayout } from '../components/AdminLayout'
+import { api } from '../../lib/api'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
@@ -13,98 +14,183 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
-function Field({ label, value, type = 'text', options }: { label: string; value: string; type?: string; options?: string[] }) {
-  const [v, setV] = useState(value)
-  return (
-    <label style={{ display: 'block', marginBottom: 16 }}>
-      <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 4, fontFamily: FONT }}>{label}</span>
-      {options
-        ? <select value={v} onChange={e => setV(e.target.value)} style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 13, fontFamily: FONT, outline: 'none', maxWidth: 420 }}>
-            {options.map(o => <option key={o}>{o}</option>)}
-          </select>
-        : <input type={type} value={v} onChange={e => setV(e.target.value)} style={{ width: '100%', maxWidth: 420, padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 13, fontFamily: FONT, boxSizing: 'border-box', outline: 'none' }} />
-      }
-    </label>
-  )
+const inputStyle: React.CSSProperties = {
+  width: '100%', maxWidth: 440, padding: '8px 10px', border: '1px solid #E2E8F0',
+  borderRadius: 8, fontSize: 13, fontFamily: FONT, boxSizing: 'border-box', outline: 'none',
+}
+const labelStyle: React.CSSProperties = {
+  fontSize: 12, fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 4, fontFamily: FONT,
 }
 
-function Toggle({ label, sub, defaultOn }: { label: string; sub: string; defaultOn?: boolean }) {
-  const [on, setOn] = useState(defaultOn ?? false)
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #F1F5F9' }}>
-      <div>
-        <div style={{ fontSize: 13, fontWeight: 600, color: DARK, fontFamily: FONT }}>{label}</div>
-        <div style={{ fontSize: 12, color: '#94A3B8', fontFamily: FONT }}>{sub}</div>
-      </div>
-      <button onClick={() => setOn(o => !o)} style={{ width: 44, height: 24, borderRadius: 12, border: 'none', background: on ? '#1D4ED8' : '#CBD5E1', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
-        <div style={{ width: 18, height: 18, borderRadius: 9, background: '#fff', position: 'absolute', top: 3, left: on ? 23 : 3, transition: 'left 0.2s' }} />
-      </button>
-    </div>
-  )
+interface Settings {
+  company: { name: string; registrationNo: string }
+  settings: Record<string, string>
 }
 
 export function SettingsPage() {
-  const [saved, setSaved] = useState(false)
-  const save = () => { setSaved(true); setTimeout(() => setSaved(false), 2500) }
+  const [form, setForm]     = useState<Settings>({ company: { name: '', registrationNo: '' }, settings: {} })
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved]   = useState(false)
+  const [error, setError]   = useState('')
+
+  useEffect(() => {
+    api.get<Settings>('/settings').then(data => {
+      setForm({
+        company: { name: data.company?.name ?? '', registrationNo: data.company?.registrationNo ?? '' },
+        settings: data.settings ?? {},
+      })
+    }).finally(() => setLoading(false))
+  }, [])
+
+  const setSetting = (key: string, value: string) =>
+    setForm(f => ({ ...f, settings: { ...f.settings, [key]: value } }))
+
+  const setCompany = (key: keyof Settings['company'], value: string) =>
+    setForm(f => ({ ...f, company: { ...f.company, [key]: value } }))
+
+  const save = async () => {
+    setSaving(true); setError('')
+    try {
+      await api.patch('/settings', form)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    } catch { setError('Failed to save settings') }
+    finally { setSaving(false) }
+  }
+
+  const s = form.settings
+
+  if (loading) return (
+    <AdminLayout title="Settings" actions={<></>}>
+      <div style={{ padding: 60, textAlign: 'center', color: '#94A3B8', fontFamily: FONT }}>Loading…</div>
+    </AdminLayout>
+  )
 
   return (
-    <AdminLayout title="Settings" actions={<Btn label={saved ? '✓ Saved' : 'Save Changes'} onClick={save} />}>
+    <AdminLayout title="Company Settings" actions={
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {error && <span style={{ color: '#EF4444', fontSize: 13, fontFamily: FONT }}>{error}</span>}
+        <button onClick={save} disabled={saving} style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: saved ? '#10B981' : DARK, color: '#fff', fontSize: 13, fontFamily: FONT, fontWeight: 600, cursor: 'pointer' }}>
+          {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save Changes'}
+        </button>
+      </div>
+    }>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
         <div>
-          <Section title="Company">
-            <Field label="Company Name"   value="MyPrintingWorld LLC" />
-            <Field label="Trade License"  value="CN-1234567" />
-            <Field label="VAT Number"     value="TRN100284765300001" />
-            <Field label="Address"        value="Unit 14, Al Quoz Industrial Area 2, Dubai, UAE" />
-            <Field label="Phone"          value="+971 4 XXX XXXX" />
-            <Field label="Support Email"  value="support@myprintingworld.ae" />
+          <Section title="Company Info">
+            <label style={{ display: 'block', marginBottom: 14 }}>
+              <span style={labelStyle}>Company Name</span>
+              <input style={inputStyle} value={form.company.name} onChange={e => setCompany('name', e.target.value)} placeholder="e.g. MyPrintingWorld LLC" />
+            </label>
+            <label style={{ display: 'block', marginBottom: 14 }}>
+              <span style={labelStyle}>Trade License No.</span>
+              <input style={inputStyle} value={form.company.registrationNo} onChange={e => setCompany('registrationNo', e.target.value)} placeholder="e.g. CN-1234567" />
+            </label>
+            <label style={{ display: 'block', marginBottom: 14 }}>
+              <span style={labelStyle}>VAT / TRN Number</span>
+              <input style={inputStyle} value={s.vatNumber ?? ''} onChange={e => setSetting('vatNumber', e.target.value)} placeholder="e.g. TRN100284765300001" />
+            </label>
+            <label style={{ display: 'block', marginBottom: 14 }}>
+              <span style={labelStyle}>Address</span>
+              <textarea style={{ ...inputStyle, minHeight: 64, resize: 'vertical' }} value={s.address ?? ''} onChange={e => setSetting('address', e.target.value)} placeholder="Unit 14, Al Quoz Industrial Area 2, Dubai, UAE" />
+            </label>
+            <label style={{ display: 'block', marginBottom: 14 }}>
+              <span style={labelStyle}>Phone</span>
+              <input style={inputStyle} value={s.phone ?? ''} onChange={e => setSetting('phone', e.target.value)} placeholder="+971 4 XXX XXXX" />
+            </label>
+            <label style={{ display: 'block', marginBottom: 14 }}>
+              <span style={labelStyle}>Support Email</span>
+              <input type="email" style={inputStyle} value={s.supportEmail ?? ''} onChange={e => setSetting('supportEmail', e.target.value)} placeholder="support@myprintingworld.ae" />
+            </label>
+            <label style={{ display: 'block', marginBottom: 0 }}>
+              <span style={labelStyle}>Website</span>
+              <input style={inputStyle} value={s.website ?? ''} onChange={e => setSetting('website', e.target.value)} placeholder="https://myprintingworld.ae" />
+            </label>
           </Section>
 
           <Section title="Finance">
-            <Field label="Default Currency" value="AED" options={['AED','USD','EUR','GBP']} />
-            <Field label="VAT Rate (%)"      value="5" type="number" />
-            <Field label="Fiscal Year Start" value="January" options={['January','April','July','October']} />
-            <Field label="Payment Terms (days)" value="30" type="number" />
-            <Field label="Invoice Prefix"    value="INV-" />
-            <Field label="Quotation Prefix"  value="QUO-" />
+            <label style={{ display: 'block', marginBottom: 14 }}>
+              <span style={labelStyle}>Default Currency</span>
+              <select style={inputStyle} value={s.currency ?? 'AED'} onChange={e => setSetting('currency', e.target.value)}>
+                {['AED', 'USD', 'EUR', 'GBP'].map(c => <option key={c}>{c}</option>)}
+              </select>
+            </label>
+            <label style={{ display: 'block', marginBottom: 14 }}>
+              <span style={labelStyle}>VAT Rate (%)</span>
+              <input type="number" style={inputStyle} value={s.vatRate ?? '5'} onChange={e => setSetting('vatRate', e.target.value)} />
+            </label>
+            <label style={{ display: 'block', marginBottom: 14 }}>
+              <span style={labelStyle}>Fiscal Year Start</span>
+              <select style={inputStyle} value={s.fiscalYearStart ?? 'January'} onChange={e => setSetting('fiscalYearStart', e.target.value)}>
+                {['January', 'April', 'July', 'October'].map(m => <option key={m}>{m}</option>)}
+              </select>
+            </label>
+            <label style={{ display: 'block', marginBottom: 14 }}>
+              <span style={labelStyle}>Payment Terms (days)</span>
+              <input type="number" style={inputStyle} value={s.paymentTerms ?? '30'} onChange={e => setSetting('paymentTerms', e.target.value)} />
+            </label>
+            <label style={{ display: 'block', marginBottom: 14 }}>
+              <span style={labelStyle}>Invoice Prefix</span>
+              <input style={inputStyle} value={s.invoicePrefix ?? 'INV-'} onChange={e => setSetting('invoicePrefix', e.target.value)} />
+            </label>
+            <label style={{ display: 'block', marginBottom: 0 }}>
+              <span style={labelStyle}>Quotation Prefix</span>
+              <input style={inputStyle} value={s.quotationPrefix ?? 'QUO-'} onChange={e => setSetting('quotationPrefix', e.target.value)} />
+            </label>
           </Section>
         </div>
 
         <div>
-          <Section title="Notifications">
-            <Toggle label="New order alert"       sub="Notify when a new order is placed"            defaultOn />
-            <Toggle label="Low stock alert"       sub="Notify when stock falls below threshold"      defaultOn />
-            <Toggle label="Payment received"      sub="Notify when customer payment is confirmed"    defaultOn />
-            <Toggle label="Overdue invoices"      sub="Daily digest of overdue invoices"             defaultOn />
-            <Toggle label="New lead assigned"     sub="Notify assigned salesperson"                  defaultOn />
-            <Toggle label="Manufacturing update"  sub="Notify when MO status changes" />
-            <Toggle label="Payroll processed"     sub="Notify HR manager when payroll runs" />
-          </Section>
-
           <Section title="System">
-            <Field label="Date Format"     value="DD/MM/YYYY" options={['DD/MM/YYYY','MM/DD/YYYY','YYYY-MM-DD']} />
-            <Field label="Time Zone"       value="Asia/Dubai (GMT+4)" options={['Asia/Dubai (GMT+4)','Asia/Riyadh (GMT+3)','UTC']} />
-            <Field label="Language"        value="English" options={['English','Arabic']} />
-            <Toggle label="Maintenance mode" sub="Disable storefront for visitors" />
-            <Toggle label="Two-factor auth"  sub="Require 2FA for all admin logins" defaultOn />
+            <label style={{ display: 'block', marginBottom: 14 }}>
+              <span style={labelStyle}>Date Format</span>
+              <select style={inputStyle} value={s.dateFormat ?? 'DD/MM/YYYY'} onChange={e => setSetting('dateFormat', e.target.value)}>
+                {['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'].map(f => <option key={f}>{f}</option>)}
+              </select>
+            </label>
+            <label style={{ display: 'block', marginBottom: 14 }}>
+              <span style={labelStyle}>Time Zone</span>
+              <select style={inputStyle} value={s.timezone ?? 'Asia/Dubai'} onChange={e => setSetting('timezone', e.target.value)}>
+                {['Asia/Dubai', 'Asia/Riyadh', 'UTC'].map(t => <option key={t}>{t}</option>)}
+              </select>
+            </label>
+            <label style={{ display: 'block', marginBottom: 0 }}>
+              <span style={labelStyle}>Language</span>
+              <select style={inputStyle} value={s.language ?? 'English'} onChange={e => setSetting('language', e.target.value)}>
+                {['English', 'Arabic'].map(l => <option key={l}>{l}</option>)}
+              </select>
+            </label>
           </Section>
 
-          <Section title="Integrations">
-            <div style={{ fontSize: 13, color: '#64748B', fontFamily: FONT, marginBottom: 12 }}>Connect external services to automate your workflow.</div>
-            {[
-              { name: 'Supabase (Database)', connected: true  },
-              { name: 'Stripe (Payments)',   connected: false },
-              { name: 'Mailchimp (Email)',   connected: false },
-              { name: 'WhatsApp Business',  connected: true  },
-              { name: 'Aramex (Shipping)',   connected: false },
-            ].map(({ name, connected }) => (
-              <div key={name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #F1F5F9' }}>
-                <span style={{ fontSize: 13, color: DARK, fontFamily: FONT }}>{name}</span>
-                <button style={{ fontSize: 12, padding: '4px 12px', border: `1px solid ${connected ? '#10B981' : '#E2E8F0'}`, borderRadius: 6, background: connected ? '#ECFDF5' : '#fff', color: connected ? '#059669' : '#64748B', cursor: 'pointer', fontFamily: FONT }}>
-                  {connected ? 'Connected' : 'Connect'}
-                </button>
-              </div>
-            ))}
+          <Section title="Order & Printing Defaults">
+            <label style={{ display: 'block', marginBottom: 14 }}>
+              <span style={labelStyle}>Default Production Lead Time (days)</span>
+              <input type="number" style={inputStyle} value={s.leadTimeDays ?? '3'} onChange={e => setSetting('leadTimeDays', e.target.value)} />
+            </label>
+            <label style={{ display: 'block', marginBottom: 14 }}>
+              <span style={labelStyle}>Low Stock Alert Threshold (units)</span>
+              <input type="number" style={inputStyle} value={s.lowStockThreshold ?? '10'} onChange={e => setSetting('lowStockThreshold', e.target.value)} />
+            </label>
+            <label style={{ display: 'block', marginBottom: 0 }}>
+              <span style={labelStyle}>Order Number Prefix</span>
+              <input style={inputStyle} value={s.orderPrefix ?? 'MPW-'} onChange={e => setSetting('orderPrefix', e.target.value)} />
+            </label>
+          </Section>
+
+          <Section title="Social & Online">
+            <label style={{ display: 'block', marginBottom: 14 }}>
+              <span style={labelStyle}>Instagram</span>
+              <input style={inputStyle} value={s.instagram ?? ''} onChange={e => setSetting('instagram', e.target.value)} placeholder="@myprintingworld" />
+            </label>
+            <label style={{ display: 'block', marginBottom: 14 }}>
+              <span style={labelStyle}>WhatsApp Business Number</span>
+              <input style={inputStyle} value={s.whatsapp ?? ''} onChange={e => setSetting('whatsapp', e.target.value)} placeholder="+971 50 XXX XXXX" />
+            </label>
+            <label style={{ display: 'block', marginBottom: 0 }}>
+              <span style={labelStyle}>Google Maps Link</span>
+              <input style={inputStyle} value={s.mapsLink ?? ''} onChange={e => setSetting('mapsLink', e.target.value)} placeholder="https://maps.google.com/..." />
+            </label>
           </Section>
         </div>
       </div>

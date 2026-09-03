@@ -1,81 +1,129 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AdminLayout, Table, SearchInput, Badge, StatCard, StatGrid } from '../components/AdminLayout'
+import { api } from '../../lib/api'
 
 const FONT = "'Poppins', system-ui, sans-serif"
-const DARK = '#0F172A'
 
-interface Customer { id: string; name: string; email: string; phone: string; company: string; orders: number; spent: number; emirate: string; active: boolean }
+interface OnlineCustomer {
+  id: string; email: string; fullName: string | null; phone: string | null
+  companyName: string | null; isActive: boolean; createdAt: string
+  _count: { orders: number; salesOrders: number }
+}
 
-const SEED: Customer[] = [
-  { id: 'CUS-001', name: 'Ahmed Al Mansouri',  email: 'ahmed@alnoor.ae',       phone: '+971 50 111 2233', company: 'Al Noor Trading LLC',  orders: 12, spent: 8400,  emirate: 'Dubai',    active: true  },
-  { id: 'CUS-002', name: 'Sara Khalid',        email: 'sara@falcon.ae',        phone: '+971 55 222 3344', company: 'Falcon Real Estate',   orders: 7,  spent: 4200,  emirate: 'Abu Dhabi',active: true  },
-  { id: 'CUS-003', name: 'Mohammed Rashid',    email: 'moh@gulfventures.ae',   phone: '+971 52 333 4455', company: 'Gulf Ventures',        orders: 4,  spent: 1980,  emirate: 'Sharjah',  active: true  },
-  { id: 'CUS-004', name: 'Priya Nair',         email: 'priya@horizon.ae',      phone: '+971 56 444 5566', company: 'Horizon Consulting',   orders: 2,  spent: 650,   emirate: 'Dubai',    active: true  },
-  { id: 'CUS-005', name: 'Liu Wei',            email: 'liu@dubaifl.ae',        phone: '+971 50 555 6677', company: 'Dubai Flavours',       orders: 9,  spent: 6300,  emirate: 'Dubai',    active: true  },
-  { id: 'CUS-006', name: 'Mehmet Yilmaz',      email: 'mehmet@apexevents.ae',  phone: '+971 54 666 7788', company: 'Apex Events',          orders: 3,  spent: 3200,  emirate: 'Ajman',    active: true  },
-  { id: 'CUS-007', name: 'Raj Patel',          email: 'raj@techhub.ae',        phone: '+971 55 777 8899', company: 'TechHub DXB',          orders: 6,  spent: 9800,  emirate: 'Dubai',    active: true  },
-  { id: 'CUS-008', name: 'Fatima Al Zaabi',    email: 'fatima@pearh.ae',       phone: '+971 50 888 9900', company: 'Pearl Hospitality',    orders: 15, spent: 24000, emirate: 'Abu Dhabi',active: true  },
-  { id: 'CUS-009', name: 'Hassan Qureshi',     email: 'hassan@desertrose.ae',  phone: '+971 52 999 0011', company: 'Desert Rose Café',     orders: 5,  spent: 2200,  emirate: 'Dubai',    active: false },
-  { id: 'CUS-010', name: 'Elena Popescu',      email: 'elena@skyline.ae',      phone: '+971 56 000 1122', company: 'SkyLine Properties',   orders: 1,  spent: 245,   emirate: 'Dubai',    active: true  },
-]
+interface WalkInCustomer {
+  id: string; name: string; phone: string | null; email: string | null
+  company: string | null; createdAt: string
+  _count?: { salesOrders?: number }
+}
+
+interface UnifiedCustomer {
+  id: string; name: string; email: string; company: string; phone: string
+  orders: number; type: 'Online' | 'Walk-in'; isActive: boolean; joined: string
+}
 
 const COLS = [
-  { key: 'id',      label: 'ID',      width: 90 },
   { key: 'name',    label: 'Name' },
-  { key: 'company', label: 'Company' },
-  { key: 'email',   label: 'Email' },
-  { key: 'phone',   label: 'Phone',   width: 150 },
-  { key: 'emirate', label: 'Emirate', width: 110 },
-  { key: 'orders',  label: 'Orders',  width: 80 },
-  { key: 'spent',   label: 'Total Spent', width: 120 },
-  { key: 'active',  label: 'Status',  width: 100 },
+  { key: 'type',    label: 'Type',    width: 100 },
+  { key: 'email',   label: 'Email',   width: 200 },
+  { key: 'company', label: 'Company', width: 160 },
+  { key: 'phone',   label: 'Phone',   width: 130 },
+  { key: 'orders',  label: 'Orders',  width: 80  },
+  { key: 'joined',  label: 'Joined',  width: 110 },
 ]
 
 export function CustomersPage() {
-  const [q, setQ]       = useState('')
-  const [em, setEm]     = useState('All')
+  const [data, setData]       = useState<UnifiedCustomer[]>([])
+  const [loading, setLoading] = useState(true)
+  const [q, setQ]             = useState('')
+  const [typeFilter, setType] = useState<'all' | 'Online' | 'Walk-in'>('all')
 
-  const emirates = ['All', ...Array.from(new Set(SEED.map(c => c.emirate)))]
+  const load = async () => {
+    setLoading(true)
+    try {
+      const [onlineRes, walkInRes] = await Promise.all([
+        api.get<{ data: OnlineCustomer[] }>('/customers?pageSize=500').catch(() => ({ data: [] as OnlineCustomer[] })),
+        api.get<{ data: WalkInCustomer[] }>('/walk-in-customers?pageSize=500').catch(() => ({ data: [] as WalkInCustomer[] })),
+      ])
 
-  const filtered = SEED.filter(c =>
-    (em === 'All' || c.emirate === em) &&
+      const online: UnifiedCustomer[] = onlineRes.data.map(c => ({
+        id: c.id, type: 'Online',
+        name:    c.fullName ?? '—',
+        email:   c.email ?? '—',
+        company: c.companyName ?? '—',
+        phone:   c.phone ?? '—',
+        orders:  c._count.orders + c._count.salesOrders,
+        isActive: c.isActive,
+        joined:  c.createdAt.slice(0, 10),
+      }))
+
+      const walkIn: UnifiedCustomer[] = walkInRes.data.map(c => ({
+        id: c.id, type: 'Walk-in',
+        name:    c.name ?? '—',
+        email:   c.email ?? '—',
+        company: c.company ?? '—',
+        phone:   c.phone ?? '—',
+        orders:  c._count?.salesOrders ?? 0,
+        isActive: true,
+        joined:  c.createdAt.slice(0, 10),
+      }))
+
+      setData([...online, ...walkIn].sort((a, b) => b.joined.localeCompare(a.joined)))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { load() }, [])
+
+  const filtered = data.filter(c =>
+    (typeFilter === 'all' || c.type === typeFilter) &&
     (c.name.toLowerCase().includes(q.toLowerCase()) ||
+     c.email.toLowerCase().includes(q.toLowerCase()) ||
      c.company.toLowerCase().includes(q.toLowerCase()) ||
-     c.email.toLowerCase().includes(q.toLowerCase()))
+     c.phone.includes(q))
   )
 
-  const totalRevenue = SEED.reduce((s, c) => s + c.spent, 0)
-  const activeCount  = SEED.filter(c => c.active).length
-
   const rows = filtered.map(c => ({
-    ...c,
-    spent:  `AED ${c.spent.toLocaleString()}`,
-    active: <Badge label={c.active ? 'Active' : 'Inactive'} color={c.active ? '#10B981' : '#64748B'} />,
+    name:    <span style={{ fontFamily: FONT, fontWeight: 600, fontSize: 13 }}>{c.name}</span>,
+    type:    <Badge label={c.type} color={c.type === 'Online' ? '#8B5CF6' : '#10B981'} />,
+    email:   c.email !== '—' ? c.email : <span style={{ color: '#94A3B8', fontSize: 12 }}>—</span>,
+    company: c.company !== '—' ? c.company : <span style={{ color: '#94A3B8', fontSize: 12 }}>—</span>,
+    phone:   c.phone !== '—' ? c.phone : <span style={{ color: '#94A3B8', fontSize: 12 }}>—</span>,
+    orders:  c.orders,
+    joined:  c.joined,
   }))
 
-  return (
-    <AdminLayout
-      title="Customers"
-      actions={<SearchInput value={q} onChange={setQ} placeholder="Search customers…" />}>
+  const online  = data.filter(c => c.type === 'Online').length
+  const walkIn  = data.filter(c => c.type === 'Walk-in').length
+  const withOrders = data.filter(c => c.orders > 0).length
 
+  return (
+    <AdminLayout title="All Customers" actions={<SearchInput value={q} onChange={setQ} placeholder="Search name, email, company…" />}>
       <StatGrid>
-        <StatCard label="Total Customers" value={String(SEED.length)}              sub="Registered accounts"  />
-        <StatCard label="Active"          value={String(activeCount)}              sub="With recent orders"   color="#10B981" />
-        <StatCard label="Total Revenue"   value={`AED ${totalRevenue.toLocaleString()}`} sub="Lifetime value" color="#10B981" />
-        <StatCard label="Avg. Order Value" value={`AED ${Math.round(totalRevenue / SEED.reduce((s,c)=>s+c.orders,0))}`} sub="Per order" />
+        <StatCard label="Total"     value={String(data.length)} sub="All customers" />
+        <StatCard label="Online"    value={String(online)}      sub="Storefront accounts" color="#8B5CF6" />
+        <StatCard label="Walk-in"   value={String(walkIn)}      sub="Manual / counter"   color="#10B981" />
+        <StatCard label="With Orders" value={String(withOrders)} sub="Have placed orders" color="#1D4ED8" />
       </StatGrid>
 
-      <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
-        {emirates.map(e => (
-          <button key={e} onClick={() => setEm(e)}
-            style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontFamily: FONT, fontWeight: 500, cursor: 'pointer', border: '1px solid #E2E8F0', background: em === e ? DARK : '#fff', color: em === e ? '#fff' : '#64748B' }}>
-            {e}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+        {(['all', 'Online', 'Walk-in'] as const).map(t => (
+          <button key={t} onClick={() => setType(t)} style={{ padding: '5px 14px', borderRadius: 20, fontSize: 12, fontFamily: FONT, fontWeight: 500, cursor: 'pointer', border: '1px solid #E2E8F0', background: typeFilter === t ? '#0F172A' : '#fff', color: typeFilter === t ? '#fff' : '#64748B' }}>
+            {t === 'all' ? `All (${data.length})` : `${t} (${t === 'Online' ? online : walkIn})`}
           </button>
         ))}
       </div>
 
-      <div style={{ fontSize: 13, color: '#64748B', marginBottom: 12 }}>{filtered.length} customers</div>
-      <Table columns={COLS} rows={rows} />
+      {loading ? (
+        <div style={{ padding: 40, textAlign: 'center', color: '#94A3B8', fontFamily: FONT }}>Loading…</div>
+      ) : data.length === 0 ? (
+        <div style={{ padding: 60, textAlign: 'center', color: '#94A3B8', fontFamily: FONT }}>No customers yet.</div>
+      ) : (
+        <>
+          <div style={{ fontSize: 13, color: '#64748B', marginBottom: 12, fontFamily: FONT }}>{filtered.length} customers</div>
+          <Table columns={COLS} rows={rows} />
+        </>
+      )}
     </AdminLayout>
   )
 }

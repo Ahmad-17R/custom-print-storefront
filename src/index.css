@@ -168,6 +168,15 @@ body {
   margin: 0;
 }
 
+/* ── Admin sidebar scrollbar ─────────────────────────────────────────────── */
+.admin-nav-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #334155 #0F172A;
+}
+.admin-nav-scroll::-webkit-scrollbar { width: 4px; }
+.admin-nav-scroll::-webkit-scrollbar-track { background: #0F172A; }
+.admin-nav-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+
 /* ── Product Detail Page ─────────────────────────────────────────────────── */
 .pdp-wrap {
   padding: 0 44px;

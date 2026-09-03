@@ -1,7 +1,13 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../../context/CartContext'
 import { CATALOG_PRODUCTS } from './CatalogPage'
+
+// Storefront product slugs that have a working in-browser design editor (pen not built yet)
+const EDITOR_TEMPLATE: Record<string, string> = {
+  'business-cards': 'business_card',
+  'letterhead':     'letterhead',
+}
 
 type FieldType = 'dropdown' | 'radio' | 'checkbox'
 interface Field { label: string; type: FieldType; options: string[] }
@@ -304,18 +310,31 @@ export function ProductDetailPage() {
   const [selections, setSelections]   = useState<Record<string, string>>({})
   const [qty, setQty]                 = useState(100)
   const [notes, setNotes]             = useState('')
-  const [addedToCart, setAddedToCart] = useState(false)
 
   const price = Math.round(product.basePrice * Math.max(1, qty / 100))
 
-  function handleAddToCart() {
-    addItem({ id: `${product.slug}::${JSON.stringify(selections)}`, slug: product.slug, name: product.name, image: product.images[0], options: Object.values(selections).filter(Boolean), qty: 1, unitPrice: price })
-    setAddedToCart(true)
-    setTimeout(() => setAddedToCart(false), 2500)
-  }
-  function handleBuyNow() {
-    addItem({ id: `${product.slug}::${JSON.stringify(selections)}`, slug: product.slug, name: product.name, image: product.images[0], options: Object.values(selections).filter(Boolean), qty: 1, unitPrice: price })
-    navigate('/checkout')
+  const editorKey  = EDITOR_TEMPLATE[product.slug]
+  const designable = !!editorKey
+  const fileRef    = useRef<HTMLInputElement>(null)
+  const pendingDest = useRef<'cart' | 'checkout'>('cart')
+
+  const addLine = (extraOptions: string[] = []) => addItem({
+    id: `${product.slug}::${JSON.stringify(selections)}::${Date.now()}`,
+    slug: product.slug, name: product.name, image: product.images[0],
+    options: [...Object.values(selections).filter(Boolean), ...extraOptions], qty: 1, unitPrice: price,
+  })
+
+  // Designable products: go straight to the editor (→ review → auto-added to cart)
+  function handleDesignIt() { navigate(`/editor?product=${editorKey}`) }
+
+  // Non-designable products: pick a file, then add to cart / go to checkout
+  function startUpload(dest: 'cart' | 'checkout') { pendingDest.current = dest; fileRef.current?.click() }
+  function handleFileChosen(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]
+    if (!f) return
+    addLine([`Design file: ${f.name}`])
+    e.target.value = ''
+    navigate(pendingDest.current === 'checkout' ? '/checkout' : '/cart')
   }
 
   const related = CATALOG_PRODUCTS.filter(p => p.slug !== product.slug).slice(0, 6)
@@ -542,41 +561,34 @@ export function ProductDetailPage() {
                   style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 8, border: '1.5px solid #E2E8F0', fontSize: 13, fontFamily: 'system-ui', color: '#0F172A', resize: 'vertical', outline: 'none', backgroundColor: '#FAFAFA' }} />
               </div>
 
-              {/* CTAs */}
-              <button onClick={handleAddToCart} className="stor-btn-primary" style={{
-                width: '100%', padding: '15px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                backgroundColor: addedToCart ? '#10B981' : '#1D4ED8', color: 'white',
-                fontSize: 15, fontWeight: 700, fontFamily: "'Poppins', system-ui", marginBottom: 10,
-              }}>
-                {addedToCart ? 'Added to Cart ✓' : `Add to Cart — AED ${price}`}
-              </button>
-              <button onClick={handleBuyNow} style={{
-                width: '100%', padding: '13px 20px', borderRadius: 10, border: '2px solid #0F172A', cursor: 'pointer',
-                backgroundColor: 'transparent', color: '#0F172A',
-                fontSize: 14, fontWeight: 700, fontFamily: "'Poppins', system-ui", marginBottom: 10,
-              }}>
-                Buy Now
-              </button>
-
-              {/* Design options */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
-                <Link to="/editor" style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                  padding: '11px', borderRadius: 9, border: '1.5px solid #E2E8F0',
-                  fontSize: 13, fontWeight: 600, fontFamily: 'system-ui', color: '#334155', textDecoration: 'none',
-                  backgroundColor: '#F8FAFC',
+              {/* CTAs — designable products go to the editor; others upload a file */}
+              <input ref={fileRef} type="file" accept="image/*,application/pdf,.ai,.psd,.eps" onChange={handleFileChosen} style={{ display: 'none' }} />
+              {designable ? (
+                <button onClick={handleDesignIt} className="stor-btn-primary" style={{
+                  width: '100%', padding: '15px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  backgroundColor: '#1D4ED8', color: 'white', fontSize: 15, fontWeight: 700, fontFamily: "'Poppins', system-ui", marginBottom: 20,
                 }}>
-                  <PencilIcon /> Design it
-                </Link>
-                <button style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                  padding: '11px', borderRadius: 9, border: '1.5px solid #E2E8F0',
-                  fontSize: 13, fontWeight: 600, fontFamily: 'system-ui', color: '#334155',
-                  backgroundColor: '#F8FAFC', cursor: 'pointer',
-                }}>
-                  <UploadIcon /> Upload file
+                  <PencilIcon /> Design it — AED {price}
                 </button>
-              </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+                  <button onClick={() => startUpload('checkout')} className="stor-btn-primary" style={{
+                    width: '100%', padding: '15px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    backgroundColor: '#1D4ED8', color: 'white', fontSize: 15, fontWeight: 700, fontFamily: "'Poppins', system-ui",
+                  }}>
+                    <UploadIcon /> Upload design &amp; Checkout — AED {price}
+                  </button>
+                  <button onClick={() => startUpload('cart')} style={{
+                    width: '100%', padding: '13px 20px', borderRadius: 10, border: '2px solid #0F172A', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    backgroundColor: 'transparent', color: '#0F172A', fontSize: 14, fontWeight: 700, fontFamily: "'Poppins', system-ui",
+                  }}>
+                    <UploadIcon /> Upload design &amp; Add to Cart
+                  </button>
+                </div>
+              )}
 
               {/* Delivery notice */}
               <div style={{ padding: '13px 16px', backgroundColor: '#F0FDF4', borderRadius: 10, border: '1px solid #BBF7D0' }}>

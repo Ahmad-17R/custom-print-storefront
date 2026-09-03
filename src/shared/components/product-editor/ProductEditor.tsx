@@ -1099,8 +1099,8 @@ export default function ProductEditor({ initialProductType = "business_card" }: 
           {/* CTA */}
           <div style={{ padding: "12px 8px", display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
             <button
-              onClick={() => navigate(`/final-steps?product=${productType}`)}
-              title="Continue to Final Steps"
+              onClick={() => navigate(`/review?product=${productType}`)}
+              title="Review your design"
               style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "9px 8px", background: "#2563EB", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer" }}
             >
               <ShoppingCart size={14} />

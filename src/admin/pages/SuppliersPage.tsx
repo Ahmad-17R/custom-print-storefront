@@ -49,7 +49,7 @@ function Modal({ sup, companyId, onClose, onSave }: { sup: Partial<Supplier> | n
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           {([['name','Supplier Name'],['contactPerson','Contact Person'],['email','Email'],['phone','Phone']] as [string,string][]).map(([k,label]) => (
             <label key={k} style={{ display: 'block', marginBottom: 14 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 4 }}>{label}{k==='name'?' *':''}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 4 }}>{label}{k==='name'?' *':(k==='email'||k==='phone')?' (optional)':''}</span>
               <input value={form[k as keyof typeof form]} onChange={e => f(k, e.target.value)} style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 13, fontFamily: FONT, boxSizing: 'border-box', outline: 'none' }} />
             </label>
           ))}

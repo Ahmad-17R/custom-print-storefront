@@ -5,14 +5,11 @@ import { api } from '../../lib/api'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 
-interface Supplier { id: string; name: string }
 interface JobStep {
   id: string
   name: string
-  supplierId: string | null
   note: string | null
   sortOrder: number
-  supplier: { id: string; name: string } | null
 }
 
 const btnBase: React.CSSProperties = {
@@ -35,9 +32,8 @@ export function AdminProductJobs() {
   const navigate = useNavigate()
 
   const [productName, setProductName] = useState('')
-  const [steps, setSteps]             = useState<JobStep[]>([])
-  const [suppliers, setSuppliers]     = useState<Supplier[]>([])
-  const [saving, setSaving]           = useState(0)
+  const [steps, setSteps]   = useState<JobStep[]>([])
+  const [saving, setSaving] = useState(0)
   const [dragIdx, setDragIdx]         = useState<number | null>(null)
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
@@ -47,14 +43,12 @@ export function AdminProductJobs() {
   }
 
   const load = async () => {
-    const [prod, stps, sups] = await Promise.all([
+    const [prod, stps] = await Promise.all([
       api.get<{ id: string; name: string }>(`/products/${productId}`),
       api.get<JobStep[]>(`/products/${productId}/jobs`),
-      api.get<{ data: Supplier[] }>('/suppliers?pageSize=200'),
     ])
     setProductName(prod.name)
     setSteps(stps)
-    setSuppliers(sups.data.filter(s => (s as any).isActive !== false))
   }
 
   useEffect(() => { load() }, [productId])
@@ -70,7 +64,7 @@ export function AdminProductJobs() {
     await track(api.delete(`/products/${productId}/jobs/${step.id}`))
   }
 
-  const updateStep = (stepId: string, patch: Partial<Pick<JobStep, 'name' | 'supplierId' | 'note'>>) => {
+  const updateStep = (stepId: string, patch: Partial<Pick<JobStep, 'name' | 'note'>>) => {
     setSteps(s => s.map(x => x.id === stepId ? { ...x, ...patch } : x))
     clearTimeout(debounceRef.current[stepId])
     debounceRef.current[stepId] = setTimeout(() => {
@@ -129,28 +123,16 @@ export function AdminProductJobs() {
               {/* Fields */}
               <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Job Name</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Step Name</span>
                   <input
                     value={step.name}
                     onChange={e => updateStep(step.id, { name: e.target.value })}
-                    placeholder="e.g. Printing, Cutting, Lamination…"
+                    placeholder="e.g. Design, Printing, Cutting, Lamination…"
                     style={{ padding: '7px 10px', border: '1px solid #E2E8F0', borderRadius: 7, fontSize: 13, fontFamily: FONT, outline: 'none' }}
                   />
                 </label>
 
                 <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Supplier <span style={{ fontWeight: 400, color: '#94A3B8' }}>(optional)</span></span>
-                  <select
-                    value={step.supplierId ?? ''}
-                    onChange={e => updateStep(step.id, { supplierId: e.target.value || null })}
-                    style={{ padding: '7px 10px', border: '1px solid #E2E8F0', borderRadius: 7, fontSize: 13, fontFamily: FONT, outline: 'none' }}
-                  >
-                    <option value="">— In-house —</option>
-                    {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                </label>
-
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, gridColumn: '1 / -1' }}>
                   <span style={{ fontSize: 11, fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Note <span style={{ fontWeight: 400, color: '#94A3B8' }}>(optional)</span></span>
                   <input
                     value={step.note ?? ''}
