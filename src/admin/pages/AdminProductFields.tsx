@@ -5,7 +5,7 @@ import { api } from '../../lib/api'
 type FieldType = 'text' | 'textarea' | 'number' | 'dropdown' | 'radio' | 'checkbox' | 'file_upload'
 
 interface FieldOption { id: string; label: string; value: string; priceModifier: number; sortOrder: number }
-interface Field { id: string; label: string; type: FieldType; isRequired: boolean; helpText: string; sortOrder: number; options: FieldOption[] }
+interface Field { id: string; label: string; type: FieldType; isRequired: boolean; askAtCheckout: boolean; helpText: string; sortOrder: number; options: FieldOption[] }
 
 const FIELD_TYPES: { value: FieldType; label: string }[] = [
   { value: 'dropdown',    label: 'Dropdown' },
@@ -119,7 +119,7 @@ function FieldCard({ field, index, total, onChange, onRemove, onAddOption, onOpt
           <button onClick={() => index < total - 1 && onMove(index, index + 1)} disabled={index === total - 1}
             style={{ background: 'none', border: 'none', cursor: index === total - 1 ? 'default' : 'pointer', color: index === total - 1 ? '#E2E8F0' : '#94A3B8', padding: '1px 4px', fontSize: 11, lineHeight: 1 }}>▼</button>
         </div>
-        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 160px auto auto', gap: 10, alignItems: 'center' }}>
+        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 160px auto auto auto', gap: 10, alignItems: 'center' }}>
           <input value={field.label} onChange={e => onChange({ label: e.target.value })}
             placeholder="Field label" style={{ ...inp, fontWeight: 600 }} />
           <select value={field.type} onChange={e => onChange({ type: e.target.value as FieldType })}
@@ -130,6 +130,11 @@ function FieldCard({ field, index, total, onChange, onRemove, onAddOption, onOpt
             <input type="checkbox" checked={field.isRequired} onChange={e => onChange({ isRequired: e.target.checked })}
               style={{ accentColor: '#1D4ED8', width: 14, height: 14 }} />
             Required
+          </label>
+          <label title="Ask the customer for this value during checkout instead of on the product page" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontFamily: 'system-ui', color: field.askAtCheckout ? '#1D4ED8' : '#64748B', cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: field.askAtCheckout ? 700 : 400 }}>
+            <input type="checkbox" checked={field.askAtCheckout} onChange={e => onChange({ askAtCheckout: e.target.checked })}
+              style={{ accentColor: '#1D4ED8', width: 14, height: 14 }} />
+            Ask at checkout
           </label>
           <div style={{ display: 'flex', gap: 4 }}>
             <button onClick={() => setExpanded(v => !v)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94A3B8', padding: 4, fontSize: 16 }}>
@@ -227,7 +232,7 @@ export function AdminProductFields() {
     const sortOrder = fields.length
     try {
       const created = await track(api.post<Field>(`/products/${productId}/fields`, {
-        label: 'New Field', type: 'text', isRequired: false, helpText: '', sortOrder,
+        label: 'New Field', type: 'text', isRequired: false, askAtCheckout: false, helpText: '', sortOrder,
       }))
       setFields(prev => [...prev, { ...created, options: [] }])
     } catch (e: unknown) { alert(e instanceof Error ? e.message : 'Failed to add field') }
@@ -347,7 +352,7 @@ export function AdminProductFields() {
           {error && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, padding: '10px 14px', color: '#DC2626', fontSize: 13, fontFamily: 'system-ui', marginBottom: 20 }}>{error}</div>}
 
           <div style={{ backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 10, padding: '12px 16px', marginBottom: 24, fontSize: 13, color: '#1E40AF', fontFamily: 'system-ui', lineHeight: 1.5 }}>
-            <strong>How it works:</strong> Fields appear on the customer-facing product page in the order shown. Drag <strong>⠿</strong> or use <strong>▲ ▼</strong> to reorder. Changes save automatically.
+            <strong>How it works:</strong> Fields normally appear on the product page. Enable <strong>Ask at checkout</strong> for product-specific questions that should appear in the checkout Product Details step. Drag <strong>⠿</strong> or use <strong>▲ ▼</strong> to reorder. Changes save automatically.
           </div>
 
           {loading ? (

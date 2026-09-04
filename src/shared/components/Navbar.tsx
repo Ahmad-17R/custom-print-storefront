@@ -138,8 +138,10 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', handle)
   }, [])
 
-  const navBg = scrolled ? 'rgba(250,250,248,0.94)' : 'transparent'
-  const linkColor = '#334155'
+  const navBg = scrolled ? 'rgba(250,250,248,0.94)' : '#16151D'
+  const foreground = scrolled ? '#0F172A' : '#F8FAFC'
+  const linkColor = scrolled ? '#334155' : '#E2E8F0'
+  const outlineBorder = scrolled ? '#CBD5E1' : 'rgba(248,250,252,0.72)'
 
   return (
     <nav style={{
@@ -156,7 +158,7 @@ export default function Navbar() {
         {/* Logo */}
         <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flexShrink: 0 }}>
           <StampMark />
-          <span style={{ fontFamily: "'Poppins', system-ui, sans-serif", fontWeight: 700, fontSize: 18, color: '#0F172A', letterSpacing: '-0.02em', lineHeight: 1 }}>
+          <span style={{ fontFamily: "'Poppins', system-ui, sans-serif", fontWeight: 700, fontSize: 18, color: foreground, letterSpacing: '-0.02em', lineHeight: 1, transition: 'color 0.3s ease' }}>
             myprintingworld
           </span>
         </Link>
@@ -202,8 +204,8 @@ export default function Navbar() {
                   onClick={() => navigate('/login')}
                   className="stor-btn-outline"
                   style={{
-                    backgroundColor: 'transparent', color: '#0F172A',
-                    border: '1.5px solid #E2E8F0', borderRadius: 8,
+                    backgroundColor: 'transparent', color: foreground,
+                    border: `1.5px solid ${outlineBorder}`, borderRadius: 8,
                     padding: '9px 18px', cursor: 'pointer',
                     fontSize: 14, fontWeight: 600, fontFamily: 'system-ui, sans-serif',
                   }}
@@ -230,7 +232,7 @@ export default function Navbar() {
         <button
           onClick={() => setMenuOpen(o => !o)}
           aria-label="Toggle menu"
-          style={{ display: 'none', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', padding: 8, color: '#0F172A', flexShrink: 0 }}
+          style={{ display: 'none', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', padding: 8, color: foreground, flexShrink: 0 }}
           className="stor-hamburger"
         >
           {menuOpen ? (

@@ -1,7 +1,22 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../../context/CartContext'
 import { CATALOG_PRODUCTS } from './CatalogPage'
+import { fetchCatalogProduct, catalogImageUrl, type CatalogProduct } from '../../lib/api'
+import {
+  configuredPrice,
+  hasQuantityField,
+  initialSelections,
+  mapCatalogFields,
+  mapMockFields,
+  missingRequiredFields,
+  optionDisplayLabel,
+  selectedConfigurationLabels,
+  selectedFieldValues,
+  productPageFields,
+  type ConfigField,
+  type ConfigSelections,
+} from '../lib/productConfigurator'
 
 // Storefront product slugs that have a working in-browser design editor (pen not built yet)
 const EDITOR_TEMPLATE: Record<string, string> = {
@@ -9,12 +24,12 @@ const EDITOR_TEMPLATE: Record<string, string> = {
   'letterhead':     'letterhead',
 }
 
-type FieldType = 'dropdown' | 'radio' | 'checkbox'
-interface Field { label: string; type: FieldType; options: string[] }
+type MockFieldType = 'dropdown' | 'radio' | 'checkbox'
+interface MockField { label: string; type: MockFieldType; options: string[] }
 interface Product {
   slug: string; name: string; category: string; description: string
   longDescription: string[]; highlights: string[]; careInstructions?: string[]
-  basePrice: number; images: string[]; badge?: string; fields: Field[]
+  basePrice: number; images: string[]; badge?: string; fields: MockField[]
 }
 
 const img = (id: string, w = 700, h = 500) =>
@@ -297,44 +312,203 @@ function FaqItem({ q, a }: { q: string; a: string }) {
   )
 }
 
+function ConfigFieldControl({
+  field,
+  value,
+  onChange,
+}: {
+  field: ConfigField
+  value: string | string[] | undefined
+  onChange: (value: string | string[]) => void
+}) {
+  const stringValue = Array.isArray(value) ? '' : value ?? ''
+  const selectedValues = Array.isArray(value) ? value : value ? [value] : []
+  const inputStyle = {
+    width: '100%', padding: '10px 12px', borderRadius: 8,
+    border: `1.5px solid ${selectedValues.length || stringValue ? '#1D4ED8' : '#E2E8F0'}`,
+    fontSize: 14, fontFamily: 'system-ui', color: '#0F172A',
+    backgroundColor: 'white', outline: 'none', boxSizing: 'border-box' as const,
+  }
+
+  let control: React.ReactNode
+  if (field.type === 'dropdown') {
+    control = (
+      <select value={stringValue} onChange={event => onChange(event.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
+        <option value="">{field.placeholder || `Select ${field.label.toLowerCase()}…`}</option>
+        {field.options.map(option => (
+          <option key={option.id} value={option.value}>{optionDisplayLabel(option)}</option>
+        ))}
+      </select>
+    )
+  } else if (field.type === 'radio') {
+    control = (
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+        {field.options.map(option => {
+          const selected = stringValue === option.value
+          return (
+            <button key={option.id} type="button" onClick={() => onChange(option.value)} style={{
+              padding: '7px 13px', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontFamily: 'system-ui',
+              fontWeight: selected ? 700 : 400,
+              border: `1.5px solid ${selected ? '#1D4ED8' : '#E2E8F0'}`,
+              backgroundColor: selected ? '#EFF6FF' : '#F8FAFC',
+              color: selected ? '#1D4ED8' : '#475569', transition: 'all 0.12s ease',
+            }}>{optionDisplayLabel(option)}</button>
+          )
+        })}
+      </div>
+    )
+  } else if (field.type === 'checkbox') {
+    const options = field.options.length
+      ? field.options
+      : [{ id: `${field.id}:yes`, label: 'Yes', value: 'yes', priceModifier: 0, isDefault: false }]
+    control = (
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+        {options.map(option => {
+          const checked = selectedValues.includes(option.value)
+          return (
+            <label key={option.id} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 11px', border: `1.5px solid ${checked ? '#1D4ED8' : '#E2E8F0'}`, borderRadius: 7, cursor: 'pointer', fontSize: 13, color: checked ? '#1D4ED8' : '#475569', background: checked ? '#EFF6FF' : '#F8FAFC' }}>
+              <input type="checkbox" checked={checked} onChange={() => onChange(checked ? selectedValues.filter(item => item !== option.value) : [...selectedValues, option.value])} style={{ accentColor: '#1D4ED8' }} />
+              {optionDisplayLabel(option)}
+            </label>
+          )
+        })}
+      </div>
+    )
+  } else if (field.type === 'textarea') {
+    control = <textarea value={stringValue} onChange={event => onChange(event.target.value)} rows={3} placeholder={field.placeholder} style={{ ...inputStyle, resize: 'vertical' }} />
+  } else if (field.type === 'file_upload') {
+    control = (
+      <div>
+        <input type="file" onChange={event => onChange(event.target.files?.[0]?.name ?? '')} style={{ ...inputStyle, padding: 8 }} />
+        {stringValue && <div style={{ fontSize: 12, color: '#1D4ED8', marginTop: 5 }}>Selected: {stringValue}</div>}
+      </div>
+    )
+  } else if (field.type === 'color_picker') {
+    control = <input type="color" value={stringValue || '#000000'} onChange={event => onChange(event.target.value)} style={{ ...inputStyle, width: 64, height: 42, padding: 4, cursor: 'pointer' }} />
+  } else {
+    control = <input type={field.type === 'number' ? 'number' : 'text'} value={stringValue} onChange={event => onChange(event.target.value)} placeholder={field.placeholder} style={inputStyle} />
+  }
+
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#0F172A', fontFamily: "'Poppins', system-ui", marginBottom: 8 }}>
+        {field.label}{field.isRequired && <span style={{ color: '#DC2626', marginLeft: 3 }}>*</span>}
+      </label>
+      {control}
+      {field.helpText && <div style={{ fontSize: 12, color: '#64748B', marginTop: 6, lineHeight: 1.45 }}>{field.helpText}</div>}
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export function ProductDetailPage() {
   const { slug } = useParams<{ slug: string }>()
   const navigate  = useNavigate()
   const { addItem } = useCart()
 
-  const product = (slug && PRODUCTS[slug]) ? PRODUCTS[slug] : DEFAULT_PRODUCT
+  // Fetch the real product from the backend (by slug) whenever the route changes.
+  // undefined = loading, null = API unavailable (use offline mock fallback).
+  const [apiProduct, setApiProduct] = useState<CatalogProduct | null | undefined>(undefined)
+  useEffect(() => {
+    let cancelled = false
+    setApiProduct(undefined)
+    if (slug) {
+      fetchCatalogProduct(slug)
+        .then(p => { if (!cancelled) setApiProduct(p) })
+        .catch(() => { if (!cancelled) setApiProduct(null) })
+    } else {
+      setApiProduct(null)
+    }
+    return () => { cancelled = true }
+  }, [slug])
+
+  // DB owns identity, price, images and configurator fields. Mock content remains only
+  // for marketing copy and as an offline fallback when the catalog API cannot be reached.
+  const mock = (slug && PRODUCTS[slug]) ? PRODUCTS[slug] : DEFAULT_PRODUCT
+  const apiImages = (apiProduct?.images ?? []).map(i => catalogImageUrl(i.url)).filter(Boolean)
+  const product: Product = {
+    ...mock,
+    slug:        slug ?? mock.slug,
+    name:        apiProduct?.name ?? mock.name,
+    category:    apiProduct?.category?.name ?? mock.category,
+    description: apiProduct?.description ?? mock.description,
+    basePrice:   apiProduct ? Number(apiProduct.basePrice) : mock.basePrice,
+    images:      apiImages.length ? apiImages : mock.images,
+    fields:      mock.fields,
+  }
+  const configFields = useMemo<ConfigField[]>(() => {
+    if (apiProduct === undefined) return []
+    if (apiProduct) return productPageFields(mapCatalogFields(apiProduct))
+    return mapMockFields(mock.fields)
+  }, [apiProduct, mock.fields])
 
   const [activeImg, setActiveImg]     = useState(0)
   const [imgErrors, setImgErrors]     = useState<Record<number, boolean>>({})
-  const [selections, setSelections]   = useState<Record<string, string>>({})
+  const [selections, setSelections]   = useState<ConfigSelections>({})
   const [qty, setQty]                 = useState(100)
   const [notes, setNotes]             = useState('')
+  const [formError, setFormError]     = useState('')
 
-  const price = Math.round(product.basePrice * Math.max(1, qty / 100))
+  useEffect(() => {
+    setSelections(initialSelections(configFields))
+    setFormError('')
+  }, [configFields])
+
+  const configured = configuredPrice(product.basePrice, configFields, selections)
+  const hasConfiguredQuantity = hasQuantityField(configFields)
+  const price = Math.round(configured * (hasConfiguredQuantity ? 1 : Math.max(1, qty / 100)))
 
   const editorKey  = EDITOR_TEMPLATE[product.slug]
   const designable = !!editorKey
   const fileRef    = useRef<HTMLInputElement>(null)
-  const pendingDest = useRef<'cart' | 'checkout'>('cart')
 
   const addLine = (extraOptions: string[] = []) => addItem({
-    id: `${product.slug}::${JSON.stringify(selections)}::${Date.now()}`,
+    id: `${product.slug}::${JSON.stringify(selections)}::${notes.trim()}`,
+    productId: apiProduct?.id,
     slug: product.slug, name: product.name, image: product.images[0],
-    options: [...Object.values(selections).filter(Boolean), ...extraOptions], qty: 1, unitPrice: price,
+    options: [
+      ...selectedConfigurationLabels(configFields, selections),
+      ...(notes.trim() ? [`Print Notes: ${notes.trim()}`] : []),
+      ...extraOptions,
+    ],
+    qty: 1,
+    unitPrice: price,
+    selections: selectedFieldValues(configFields, selections),
+    note: notes.trim() || undefined,
   })
 
+  function validateConfiguration(): boolean {
+    const missing = missingRequiredFields(configFields, selections)
+    if (missing.length === 0) {
+      setFormError('')
+      return true
+    }
+    setFormError(`Please complete: ${missing.map(field => field.label).join(', ')}`)
+    return false
+  }
+
   // Designable products: go straight to the editor (→ review → auto-added to cart)
-  function handleDesignIt() { navigate(`/editor?product=${editorKey}`) }
+  function handleDesignIt() {
+    if (!validateConfiguration()) return
+    navigate(`/editor?product=${editorKey}`)
+  }
 
   // Non-designable products: pick a file, then add to cart / go to checkout
-  function startUpload(dest: 'cart' | 'checkout') { pendingDest.current = dest; fileRef.current?.click() }
+  function startUpload() {
+    if (!validateConfiguration()) return
+    fileRef.current?.click()
+  }
+  function startCheckout() {
+    if (!validateConfiguration()) return
+    addLine()
+    navigate('/cart?checkout=1')
+  }
   function handleFileChosen(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
     if (!f) return
     addLine([`Design file: ${f.name}`])
     e.target.value = ''
-    navigate(pendingDest.current === 'checkout' ? '/checkout' : '/cart')
+    navigate('/cart')
   }
 
   const related = CATALOG_PRODUCTS.filter(p => p.slug !== product.slug).slice(0, 6)
@@ -509,47 +683,30 @@ export function ProductDetailPage() {
               </p>
 
               {/* Fields */}
-              {product.fields.map(field => (
-                <div key={field.label} style={{ marginBottom: 18 }}>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#0F172A', fontFamily: "'Poppins', system-ui", marginBottom: 8 }}>
-                    {field.label}
-                    {selections[field.label] && <span style={{ fontWeight: 400, color: '#1D4ED8', marginLeft: 6 }}>— {selections[field.label]}</span>}
-                  </label>
-                  {field.type === 'dropdown' ? (
-                    <select value={selections[field.label] || ''} onChange={e => setSelections(p => ({ ...p, [field.label]: e.target.value }))}
-                      style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: `1.5px solid ${selections[field.label] ? '#1D4ED8' : '#E2E8F0'}`, fontSize: 14, fontFamily: 'system-ui', color: '#0F172A', backgroundColor: 'white', cursor: 'pointer', outline: 'none' }}>
-                      <option value="">Select {field.label.toLowerCase()}…</option>
-                      {field.options.map(o => <option key={o} value={o}>{o}</option>)}
-                    </select>
-                  ) : (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
-                      {field.options.map(o => {
-                        const sel = selections[field.label] === o
-                        return (
-                          <button key={o} onClick={() => setSelections(p => ({ ...p, [field.label]: o }))} style={{
-                            padding: '7px 13px', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontFamily: 'system-ui',
-                            fontWeight: sel ? 700 : 400,
-                            border: `1.5px solid ${sel ? '#1D4ED8' : '#E2E8F0'}`,
-                            backgroundColor: sel ? '#EFF6FF' : '#F8FAFC',
-                            color: sel ? '#1D4ED8' : '#475569',
-                            transition: 'all 0.12s ease',
-                          }}>{o}</button>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
+              {apiProduct === undefined && (
+                <div style={{ padding: '12px 0 18px', color: '#64748B', fontSize: 13 }}>Loading product options…</div>
+              )}
+              {configFields.map(field => (
+                <ConfigFieldControl
+                  key={field.id}
+                  field={field}
+                  value={selections[field.id]}
+                  onChange={value => {
+                    setSelections(previous => ({ ...previous, [field.id]: value }))
+                    setFormError('')
+                  }}
+                />
               ))}
 
               {/* Qty stepper */}
-              <div style={{ marginBottom: 20 }}>
+              {!hasConfiguredQuantity && <div style={{ marginBottom: 20 }}>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#0F172A', fontFamily: "'Poppins', system-ui", marginBottom: 8 }}>Quantity</label>
                 <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid #E2E8F0', borderRadius: 8, overflow: 'hidden', width: 'fit-content' }}>
                   <button onClick={() => setQty(q => Math.max(50, q - 50))} style={{ width: 40, height: 40, backgroundColor: '#F8FAFC', border: 'none', cursor: 'pointer', fontSize: 20, color: '#0F172A', fontWeight: 700 }}>−</button>
                   <span style={{ padding: '0 20px', fontSize: 15, fontWeight: 700, fontFamily: 'system-ui', color: '#0F172A' }}>{qty}</span>
                   <button onClick={() => setQty(q => q + 50)} style={{ width: 40, height: 40, backgroundColor: '#F8FAFC', border: 'none', cursor: 'pointer', fontSize: 20, color: '#0F172A', fontWeight: 700 }}>+</button>
                 </div>
-              </div>
+              </div>}
 
               {/* Print notes */}
               <div style={{ marginBottom: 22 }}>
@@ -562,6 +719,11 @@ export function ProductDetailPage() {
               </div>
 
               {/* CTAs — designable products go to the editor; others upload a file */}
+              {formError && (
+                <div role="alert" style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 8, background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', fontSize: 13 }}>
+                  {formError}
+                </div>
+              )}
               <input ref={fileRef} type="file" accept="image/*,application/pdf,.ai,.psd,.eps" onChange={handleFileChosen} style={{ display: 'none' }} />
               {designable ? (
                 <button onClick={handleDesignIt} className="stor-btn-primary" style={{
@@ -573,14 +735,14 @@ export function ProductDetailPage() {
                 </button>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-                  <button onClick={() => startUpload('checkout')} className="stor-btn-primary" style={{
+                  <button onClick={startCheckout} className="stor-btn-primary" style={{
                     width: '100%', padding: '15px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                     backgroundColor: '#1D4ED8', color: 'white', fontSize: 15, fontWeight: 700, fontFamily: "'Poppins', system-ui",
                   }}>
                     <UploadIcon /> Upload design &amp; Checkout — AED {price}
                   </button>
-                  <button onClick={() => startUpload('cart')} style={{
+                  <button onClick={startUpload} style={{
                     width: '100%', padding: '13px 20px', borderRadius: 10, border: '2px solid #0F172A', cursor: 'pointer',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                     backgroundColor: 'transparent', color: '#0F172A', fontSize: 14, fontWeight: 700, fontFamily: "'Poppins', system-ui",

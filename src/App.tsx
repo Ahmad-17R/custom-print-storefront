@@ -15,6 +15,7 @@ import { SignupPage }          from './customer/pages/SignupPage'
 import { CheckoutPage }        from './customer/pages/CheckoutPage'
 import { OrderConfirmationPage }from './customer/pages/OrderConfirmationPage'
 import { MyOrdersPage }        from './customer/pages/MyOrdersPage'
+import { OrderDetailPage }     from './customer/pages/OrderDetailPage'
 
 // Admin auth
 import { type ReactNode, useEffect } from 'react'
@@ -160,7 +161,7 @@ function Layout() {
           <Route path="/auth/callback"         element={<AuthCallbackPage />} />
           <Route path="/checkout"              element={<CheckoutPage />} />
           <Route path="/orders/:id/confirmation" element={<OrderConfirmationPage />} />
-          <Route path="/orders/:id"            element={<MyOrdersPage />} />
+          <Route path="/orders/:id"            element={<OrderDetailPage />} />
           <Route path="/orders"                element={<MyOrdersPage />} />
 
           {/* Admin — all routes share the country context */}

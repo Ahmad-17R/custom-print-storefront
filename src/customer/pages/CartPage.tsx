@@ -1,13 +1,19 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useCart } from '../../context/CartContext'
 import { CATALOG_PRODUCTS } from './CatalogPage'
+import { CheckoutDialog } from './CheckoutPage'
 
 export function CartPage() {
   const { items, removeItem, updateQty, total, addItem } = useCart()
   const navigate = useNavigate()
+  const location = useLocation()
+  const [checkoutOpen, setCheckoutOpen] = useState(new URLSearchParams(location.search).get('checkout') === '1')
+  const closeCheckout = () => { setCheckoutOpen(false); navigate('/cart', { replace: true }) }
 
-  const vat      = Math.round(total * 0.05)
-  const grandTotal = total + vat
+  const vat = Math.round((total * 5 / 105) * 100) / 100
+  const net = Math.round((total - vat) * 100) / 100
+  const grandTotal = total
 
   // "More things you may like" — products from the same categories as what's in the cart
   const cartSlugs = new Set(items.map(i => i.slug))
@@ -23,7 +29,7 @@ export function CartPage() {
 
   if (items.length === 0) {
     return (
-      <div style={{ backgroundColor: '#F8FAFC', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
+      <div className="storefront-order-flow" style={{ backgroundColor: '#F8FAFC', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
         <div style={{ width: 72, height: 72, borderRadius: '50%', backgroundColor: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
             <path d="M4 6h3l5 14h12l4-14" stroke="#94A3B8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
@@ -41,7 +47,7 @@ export function CartPage() {
   }
 
   return (
-    <div style={{ backgroundColor: '#F8FAFC', minHeight: '100vh' }}>
+    <div className="storefront-order-flow" style={{ backgroundColor: '#F8FAFC', minHeight: '100vh' }}>
       <div className="stor-section" style={{ paddingTop: 36, paddingBottom: 36 }}>
         <h1 style={{ fontFamily: "'Poppins', system-ui", fontWeight: 800, fontSize: 28, color: '#0F172A', margin: '0 0 28px', letterSpacing: '-0.02em' }}>
           Your Cart <span style={{ fontSize: 18, fontWeight: 600, color: '#64748B' }}>({items.length} item{items.length !== 1 ? 's' : ''})</span>
@@ -118,11 +124,11 @@ export function CartPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginBottom: 20 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontFamily: 'system-ui' }}>
                 <span style={{ color: '#64748B' }}>Subtotal</span>
-                <span style={{ fontWeight: 600 }}>AED {total}</span>
+                <span style={{ fontWeight: 600 }}>AED {net.toFixed(2)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontFamily: 'system-ui' }}>
-                <span style={{ color: '#64748B' }}>VAT (5%)</span>
-                <span style={{ fontWeight: 600 }}>AED {vat}</span>
+                <span style={{ color: '#64748B' }}>VAT included (5%)</span>
+                <span style={{ fontWeight: 600 }}>AED {vat.toFixed(2)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontFamily: 'system-ui' }}>
                 <span style={{ color: '#64748B' }}>Delivery</span>
@@ -132,21 +138,21 @@ export function CartPage() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 19, fontFamily: "'Poppins', system-ui", fontWeight: 800, color: '#0F172A', marginBottom: 20, paddingTop: 14, borderTop: '1px solid #F1F5F9' }}>
               <span>Total</span>
-              <span>AED {grandTotal}</span>
+              <span>AED {grandTotal.toFixed(2)}</span>
             </div>
 
-            <Link to="/checkout" style={{
+            <button type="button" onClick={() => setCheckoutOpen(true)} style={{
               display: 'block', textAlign: 'center',
               backgroundColor: '#1D4ED8', color: 'white',
               borderRadius: 10, padding: '14px 16px',
               fontSize: 15, fontWeight: 700, fontFamily: 'system-ui',
-              textDecoration: 'none',
+              border: 0, width: '100%', cursor: 'pointer',
             }}>
               Proceed to Checkout →
-            </Link>
+            </button>
 
             <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
-              {['Visa', 'MC', 'Apple Pay', 'Cash'].map(m => (
+              {['Bank transfer', 'Cash on delivery'].map(m => (
                 <span key={m} style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', fontFamily: 'system-ui', border: '1px solid #E2E8F0', borderRadius: 4, padding: '2px 6px' }}>{m}</span>
               ))}
             </div>
@@ -179,6 +185,7 @@ export function CartPage() {
           </div>
         )}
       </div>
+      {checkoutOpen && <CheckoutDialog onClose={closeCheckout} />}
     </div>
   )
 }

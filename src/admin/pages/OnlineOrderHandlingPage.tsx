@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { AdminLayout, StatCard, StatGrid, Badge } from '../components/AdminLayout'
+import { AdminOrderInformation, type AdminOrderDetail } from '../components/AdminOrderDetails'
 import { api } from '../../lib/api'
 
 const FONT = "'Poppins', system-ui, sans-serif"
@@ -22,11 +23,7 @@ interface OJob {
   supplierId?: string | null; supplier?: { name: string } | null; supplierCost?: number | null; supplierStatus?: string | null
   materials: OMat[]
 }
-interface OnlineOrder {
-  id: string; orderNumber: string; status: string; paymentStatus: string; total: number; handlingWarehouseId?: string | null
-  customer?: { fullName?: string | null; email?: string | null }
-  jobs: OJob[]
-}
+type OnlineOrder = Omit<AdminOrderDetail, 'jobs'> & { jobs: OJob[] }
 interface Ref { id: string; name: string }
 interface Worker { id: string; name: string; jobTitle?: string; activeJobs: number }
 
@@ -204,6 +201,7 @@ function OrderDrawer({ orderId, warehouses, suppliers, materials, onClose, onUpd
           <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: DARK }}>{order.orderNumber}</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#94A3B8' }}>×</button>
         </div>
+        <AdminOrderInformation order={order} />
         <div style={{ marginTop: 40, textAlign: 'center', maxWidth: 380, margin: '40px auto 0' }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: DARK, marginBottom: 8 }}>Which warehouse is handling this order?</div>
           <div style={{ fontSize: 13, color: '#64748B', marginBottom: 20, lineHeight: 1.6 }}>Workers and materials come from the warehouse you pick. Changeable until work begins.</div>
@@ -230,11 +228,13 @@ function OrderDrawer({ orderId, warehouses, suppliers, materials, onClose, onUpd
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', borderBottom: '1px solid #F1F5F9' }}>
         {[
-          { l: 'Order Total', v: `AED ${fmt(order.total)}`, c: DARK },
+          { l: 'Order Total', v: `AED ${fmt(Number(order.total))}`, c: DARK },
           { l: 'Payment', v: order.paymentStatus === 'paid' ? 'Paid ✓' : order.paymentStatus, c: '#10B981' },
           { l: 'Status', v: S_LABEL[order.status] ?? order.status, c: S_COLOR[order.status] ?? DARK },
         ].map(x => <div key={x.l} style={{ padding: '12px 16px', textAlign: 'center', borderRight: '1px solid #F1F5F9' }}><div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600 }}>{x.l}</div><div style={{ fontSize: 14, fontWeight: 700, color: x.c }}>{x.v}</div></div>)}
       </div>
+
+      <AdminOrderInformation order={order} />
 
       {/* Warehouse bar */}
       <div style={{ padding: '8px 20px', borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', gap: 10, background: '#F8FAFC' }}>
@@ -298,7 +298,7 @@ export function OnlineOrderHandlingPage() {
     <AdminLayout title="Online Order Handling" actions={<></>}>
       <StatGrid>
         <StatCard label="Active Online" value={String(orders.length)} sub="Need handling" />
-        <StatCard label="Confirmed" value={String(orders.filter(o => o.status === 'confirmed').length)} sub="Paid, awaiting production" color="#8B5CF6" />
+        <StatCard label="Confirmed" value={String(orders.filter(o => o.status === 'confirmed').length)} sub="Awaiting production" color="#8B5CF6" />
         <StatCard label="In Production" value={String(orders.filter(o => o.status === 'in_production').length)} sub="Being worked on" color="#3B82F6" />
         <StatCard label="Ready" value={String(orders.filter(o => o.status === 'ready').length)} sub="Ready to deliver" color="#10B981" />
       </StatGrid>
@@ -326,7 +326,7 @@ export function OnlineOrderHandlingPage() {
                     <div style={{ fontFamily: FONT, fontSize: 12, color: '#64748B' }}>{o.customer?.fullName ?? o.customer?.email ?? 'Online'}</div>
                   </div>
                   <Badge label={S_LABEL[o.status] ?? o.status} color={S_COLOR[o.status] ?? '#64748B'} />
-                  <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: '#ECFDF5', color: '#059669', fontWeight: 600 }}>Paid</span>
+                  <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: o.paymentStatus === 'paid' ? '#ECFDF5' : '#FFFBEB', color: o.paymentStatus === 'paid' ? '#059669' : '#D97706', fontWeight: 600, textTransform: 'capitalize' }}>{o.paymentStatus.replaceAll('_', ' ')}</span>
                   <div style={{ flex: 1, minWidth: 140 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                       <span style={{ fontSize: 11, color: '#94A3B8', fontFamily: FONT }}>Jobs</span>
@@ -335,7 +335,7 @@ export function OnlineOrderHandlingPage() {
                     <div style={{ height: 6, background: '#E2E8F0', borderRadius: 3, overflow: 'hidden' }}><div style={{ height: '100%', width: `${pct}%`, background: pct === 100 ? '#10B981' : '#3B82F6', borderRadius: 3 }} /></div>
                   </div>
                   {unassigned > 0 && <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 999, background: '#FEF2F2', color: '#DC2626' }}>{unassigned} unassigned</span>}
-                  <div style={{ minWidth: 100, textAlign: 'right', fontFamily: FONT, fontSize: 13, fontWeight: 700, color: DARK }}>AED {fmt(o.total)}</div>
+                  <div style={{ minWidth: 100, textAlign: 'right', fontFamily: FONT, fontSize: 13, fontWeight: 700, color: DARK }}>AED {fmt(Number(o.total))}</div>
                   <button style={{ background: DARK, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 700, fontFamily: FONT, cursor: 'pointer' }}>Handle →</button>
                 </div>
               )

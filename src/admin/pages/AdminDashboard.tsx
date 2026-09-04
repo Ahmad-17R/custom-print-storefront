@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AdminLayout, Badge, Table } from '../components/AdminLayout'
+import { api } from '../../lib/api'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
@@ -98,13 +100,6 @@ const Icon = {
   ),
 }
 
-const STATS = [
-  { label: 'Active Products', value: '24',         sub: '+3 this month',      color: '#10B981', bg: '#F0FDF4', iconColor: '#10B981', Icon: Icon.Box },
-  { label: 'Pending Orders',  value: '18',         sub: '4 need attention',   color: '#EF4444', bg: '#FEF2F2', iconColor: '#EF4444', Icon: Icon.Clock },
-  { label: 'Low Stock Items', value: '7',          sub: 'Reorder needed',     color: '#F59E0B', bg: '#FFFBEB', iconColor: '#F59E0B', Icon: Icon.AlertTriangle },
-  { label: 'Revenue (Aug)',   value: 'AED 48,200', sub: '+12% vs last month', color: '#1D4ED8', bg: '#EFF6FF', iconColor: '#1D4ED8', Icon: Icon.TrendingUp },
-]
-
 const ORDER_COLS = [
   { key: 'id',       label: 'Order ID',  width: 100 },
   { key: 'customer', label: 'Customer' },
@@ -113,20 +108,38 @@ const ORDER_COLS = [
   { key: 'date',     label: 'Date',      width: 70 },
 ]
 
+const statusLabel: Record<string, string> = {
+  pending: 'Pending', confirmed: 'Confirmed', in_production: 'In Production',
+  ready: 'Ready', delivered: 'Delivered', cancelled: 'Cancelled', refunded: 'Refunded',
+}
 const statusColor: Record<string, string> = {
-  'In Production':   '#1D4ED8',
-  'Artwork Review':  '#F59E0B',
-  'Delivered':       '#10B981',
-  'Pending Payment': '#EF4444',
+  pending: '#F59E0B', confirmed: '#1D4ED8', in_production: '#8B5CF6',
+  ready: '#10B981', delivered: '#10B981', cancelled: '#EF4444', refunded: '#EF4444',
 }
 
-const ORDER_ROWS = [
-  { id: 'ORD-1042', customer: 'Al Noor Trading LLC', product: 'Business Cards × 1000', status: 'In Production',   date: 'Aug 11' },
-  { id: 'ORD-1041', customer: 'Falcon Real Estate',   product: 'Letterhead × 500',      status: 'Artwork Review',  date: 'Aug 10' },
-  { id: 'ORD-1040', customer: 'Gulf Ventures',        product: 'Roll-Up Banner × 2',    status: 'Delivered',       date: 'Aug 9'  },
-  { id: 'ORD-1039', customer: 'Horizon Consulting',   product: 'Brochures × 250',       status: 'Pending Payment', date: 'Aug 8'  },
-  { id: 'ORD-1038', customer: 'Dubai Flavours',       product: 'Packaging Boxes × 500', status: 'In Production',   date: 'Aug 7'  },
-].map(r => ({ ...r, status: <Badge label={r.status} color={statusColor[r.status] ?? '#64748B'} /> }))
+interface DashboardOrder {
+  id: string
+  orderNumber: string
+  status: string
+  paymentStatus: string
+  createdAt: string
+  contactName: string | null
+  customer: { fullName: string | null; email: string }
+  items: { productName: string; quantity: number }[]
+}
+
+interface DashboardSummary {
+  activeProducts: number
+  productsAddedThisMonth: number
+  pendingOrders: number
+  unpaidPendingOrders: number
+  lowStockItems: number
+  lowStockThreshold: number
+  currentMonthRevenue: number
+  previousMonthRevenue: number
+  revenueChangePercent: number | null
+  recentOrders: DashboardOrder[]
+}
 
 const QUICK_GROUPS = [
   {
@@ -164,13 +177,49 @@ const QUICK_GROUPS = [
 
 export function AdminDashboard() {
   const navigate = useNavigate()
+  const [summary, setSummary] = useState<DashboardSummary | null>(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    api.get<DashboardSummary>('/dashboard')
+      .then(data => { if (!cancelled) setSummary(data) })
+      .catch(() => { if (!cancelled) setError('Dashboard data could not be loaded.') })
+    return () => { cancelled = true }
+  }, [])
+
+  const month = new Intl.DateTimeFormat('en', { month: 'short' }).format(new Date())
+  const revenueSub = summary?.revenueChangePercent == null
+    ? (summary?.currentMonthRevenue ? 'No paid revenue last month' : 'No paid orders this month')
+    : `${summary.revenueChangePercent >= 0 ? '+' : ''}${summary.revenueChangePercent}% vs last month`
+  const stats = [
+    { label: 'Active Products', value: summary ? String(summary.activeProducts) : '—', sub: summary ? `${summary.productsAddedThisMonth} added this month` : 'Loading…', color: '#10B981', bg: '#F0FDF4', iconColor: '#10B981', Icon: Icon.Box },
+    { label: 'Pending Orders', value: summary ? String(summary.pendingOrders) : '—', sub: summary ? `${summary.unpaidPendingOrders} unpaid` : 'Loading…', color: '#EF4444', bg: '#FEF2F2', iconColor: '#EF4444', Icon: Icon.Clock },
+    { label: 'Low Stock Items', value: summary ? String(summary.lowStockItems) : '—', sub: summary ? `At or below ${summary.lowStockThreshold} units` : 'Loading…', color: '#F59E0B', bg: '#FFFBEB', iconColor: '#F59E0B', Icon: Icon.AlertTriangle },
+    { label: `Revenue (${month})`, value: summary ? `AED ${summary.currentMonthRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—', sub: summary ? revenueSub : 'Loading…', color: '#1D4ED8', bg: '#EFF6FF', iconColor: '#1D4ED8', Icon: Icon.TrendingUp },
+  ]
+  const orderRows = (summary?.recentOrders ?? []).map(order => {
+    const first = order.items[0]
+    const product = first
+      ? `${first.productName} × ${first.quantity}${order.items.length > 1 ? ` + ${order.items.length - 1} more` : ''}`
+      : 'No items'
+    return {
+      id: order.orderNumber,
+      customer: order.contactName ?? order.customer.fullName ?? order.customer.email,
+      product,
+      status: <Badge label={statusLabel[order.status] ?? order.status} color={statusColor[order.status] ?? '#64748B'} />,
+      date: new Date(order.createdAt).toLocaleDateString('en-AE', { month: 'short', day: 'numeric' }),
+    }
+  })
 
   return (
     <AdminLayout title="Dashboard">
 
+      {error && <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 8, background: '#FEF2F2', color: '#B91C1C', fontSize: 13, fontFamily: FONT }}>{error}</div>}
+
       {/* Stat cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-        {STATS.map(s => (
+        {stats.map(s => (
           <div key={s.label} style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 12, padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: FONT }}>{s.label}</span>
@@ -196,7 +245,7 @@ export function AdminDashboard() {
               style={{ fontSize: 12, padding: '5px 12px', border: '1px solid #E2E8F0', borderRadius: 6, background: '#fff', cursor: 'pointer', fontFamily: FONT, color: '#1D4ED8', fontWeight: 500 }}
             >View all →</button>
           </div>
-          <Table columns={ORDER_COLS} rows={ORDER_ROWS} onRowClick={() => navigate('/admin/orders')} />
+          <Table columns={ORDER_COLS} rows={orderRows} onRowClick={() => navigate('/admin/orders')} />
         </div>
 
         {/* Quick Access */}

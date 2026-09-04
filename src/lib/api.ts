@@ -31,6 +31,122 @@ export const api = {
   delete: <T>(path: string)                  => request<T>('DELETE', path),
 }
 
+// ── Public storefront catalog ──────────────────────────────────────────────────
+// Served under /customer (NOT /api/v1) and public — so no Authorization header.
+// NOTE: Prisma serialises Decimal as a JSON string → basePrice is a string; Number() it.
+export const API_ORIGIN = 'http://localhost:4000'
+const CUSTOMER_BASE = `${API_ORIGIN}/customer`
+
+export interface CatalogImage { id: string; url: string; altText: string | null; sortOrder: number; isMain: boolean }
+export interface CatalogFieldOption {
+  id: string; label: string; value: string; sortOrder: number
+  priceModifier: string; isDefault: boolean
+}
+export interface CatalogField {
+  id: string; label: string; type: string; sortOrder: number
+  placeholder: string | null; helpText: string | null; isRequired: boolean; askAtCheckout: boolean
+  options: CatalogFieldOption[]
+}
+export interface CatalogDetailsField {
+  id: string; label: string; type: string; sortOrder: number
+  placeholder: string | null; helpText: string | null; isRequired: boolean
+  options: string[]
+}
+export interface CatalogProduct {
+  id: string; slug: string; name: string; description: string | null
+  basePrice: string
+  isActive: boolean
+  category: { id: string; name: string } | null
+  brand: { id: string; name: string } | null
+  images: CatalogImage[]
+  fields?: CatalogField[]
+  detailsForm?: { id: string; title: string; subtitle: string | null; fields: CatalogDetailsField[] } | null
+}
+
+async function customerRequest<T>(method: string, path: string, accessToken?: string, body?: unknown): Promise<T> {
+  const res = await fetch(`${CUSTOMER_BASE}${path}`, {
+    method,
+    headers: {
+      ...(body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: body instanceof FormData ? body : body === undefined ? undefined : JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    let message = `${method} ${path} → ${res.status}`
+    try { message = JSON.parse(text)?.error ?? message } catch { message = text || message }
+    throw new Error(message)
+  }
+  return res.json() as Promise<T>
+}
+
+async function customerGet<T>(path: string, accessToken?: string): Promise<T> {
+  return customerRequest<T>('GET', path, accessToken)
+}
+
+export const fetchCatalog        = ()             => customerGet<CatalogProduct[]>('/catalog')
+export const fetchCatalogProduct = (slug: string) => customerGet<CatalogProduct>(`/catalog/${slug}`)
+
+export interface OrderFieldValue {
+  id: string; fieldId: string | null; fieldLabel: string; fieldType: string
+  value: string; displayValue: string; optionValues: unknown; priceModifier: string
+}
+export interface OrderAttachment {
+  id: string; kind: string; fieldId: string | null; fieldLabel: string | null
+  originalName: string; mimeType: string; size: number
+}
+export interface CustomerOrderItem {
+  id: string; productId: string; productName: string; unitPrice: string
+  quantity: number; total: string; note: string | null
+  fieldValues: OrderFieldValue[]; attachments: OrderAttachment[]
+}
+export interface CustomerOrder {
+  id: string; orderNumber: string; status: string; paymentStatus: string
+  paymentMethod: string | null; paymentReference: string | null
+  subtotal: string; vatAmount: string; deliveryFee: string; total: string
+  notes: string | null; contactName: string | null; contactEmail: string | null
+  contactPhone: string | null; deliveryLine1: string | null; deliveryLine2: string | null
+  deliveryCity: string | null; deliveryEmirate: string | null; deliveryCountry: string | null
+  deliveryNotes: string | null; createdAt: string
+  items: CustomerOrderItem[]
+  timeline: Array<{ id: string; status: string; note: string | null; createdAt: string }>
+}
+
+export const uploadCustomerFile = async (file: File, accessToken: string) => {
+  const body = new FormData()
+  body.append('file', file)
+  return customerRequest<{ token: string; originalName: string; mimeType: string; size: number }>('POST', '/uploads', accessToken, body)
+}
+export const createCustomerOrder = (payload: unknown, accessToken: string) =>
+  customerRequest<CustomerOrder>('POST', '/orders', accessToken, payload)
+export const fetchCustomerOrders = (accessToken: string) => customerGet<CustomerOrder[]>('/orders', accessToken)
+export const fetchCustomerOrder = (id: string, accessToken: string) => customerGet<CustomerOrder>(`/orders/${id}`, accessToken)
+export const cancelCustomerOrder = (id: string, accessToken: string, note?: string) =>
+  customerRequest<CustomerOrder>('POST', `/orders/${id}/cancel`, accessToken, { note })
+
+export async function downloadCustomerAttachment(orderId: string, attachmentId: string, accessToken: string, filename: string) {
+  const res = await fetch(`${CUSTOMER_BASE}/orders/${orderId}/attachments/${attachmentId}`, { headers: { Authorization: `Bearer ${accessToken}` } })
+  if (!res.ok) throw new Error('Could not download attachment')
+  const href = URL.createObjectURL(await res.blob())
+  const link = document.createElement('a'); link.href = href; link.download = filename; link.click()
+  URL.revokeObjectURL(href)
+}
+
+export async function downloadAdminAttachment(orderId: string, attachmentId: string, filename: string) {
+  const token = getToken()
+  const res = await fetch(`${BASE}/orders/${orderId}/attachments/${attachmentId}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+  if (!res.ok) throw new Error('Could not download attachment')
+  const href = URL.createObjectURL(await res.blob())
+  const link = document.createElement('a'); link.href = href; link.download = filename; link.click()
+  URL.revokeObjectURL(href)
+}
+
+// Seeded catalog images are absolute Unsplash URLs; admin-uploaded ones are relative
+// (/uploads/…) and need the API origin prefixed.
+export const catalogImageUrl = (url?: string | null) =>
+  !url ? '' : url.startsWith('http') ? url : `${API_ORIGIN}${url}`
+
 // ── Internal (owner + employee) auth — against our own DB, not Supabase ────────
 export interface AuthEmployee {
   id: string; employeeNo: string; name: string; email?: string | null

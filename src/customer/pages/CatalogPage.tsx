@@ -1,13 +1,24 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { fetchCatalog, catalogImageUrl } from '../../lib/api'
 
-const CATEGORIES = ['All', 'Business Cards', 'Stationery', 'Marketing', 'Packaging', 'Signage', 'Apparel & Gifts']
+// Preferred tab order for the known catalog categories; any other category the
+// admin creates is appended alphabetically. The actual tab list is derived from
+// the live products at runtime (see `categories` below) so it never desyncs.
+const CATEGORY_ORDER = ['Business Cards', 'Stationery', 'Marketing', 'Packaging', 'Signage', 'Apparel & Gifts']
 
 // Reliable Unsplash fallbacks — second entry used if first fails
 const img = (id: string, w = 600, h = 380) =>
   `https://images.unsplash.com/${id}?w=${w}&h=${h}&q=80&auto=format&fit=crop`
 
-export const CATALOG_PRODUCTS = [
+export interface CatalogCard {
+  id: string; slug: string; name: string; category: string; basePrice: number
+  badge?: string; description: string; image: string; fallback: string
+}
+
+// Mock catalog — kept as the offline fallback (and reused by ProductDetailPage for
+// marketing copy). Live data from the backend replaces this at runtime when available.
+export const CATALOG_PRODUCTS: CatalogCard[] = [
   {
     id: '1', slug: 'business-cards', name: 'Business Cards', category: 'Business Cards', basePrice: 49, badge: 'Bestseller',
     description: 'Premium 350 GSM cards with sharp 300 DPI print. Multiple finishes available.',
@@ -130,7 +141,7 @@ export const CATALOG_PRODUCTS = [
   },
 ]
 
-function ProductCard({ product }: { product: typeof CATALOG_PRODUCTS[0] }) {
+function ProductCard({ product }: { product: CatalogCard }) {
   const [hovered, setHovered] = useState(false)
   const [src, setSrc] = useState(product.image)
 
@@ -204,8 +215,52 @@ function ProductCard({ product }: { product: typeof CATALOG_PRODUCTS[0] }) {
 export function CatalogPage() {
   const [activeCategory, setActiveCategory] = useState('All')
   const [search, setSearch] = useState('')
+  // Live catalog from the backend; seeded to the mock list so the page renders
+  // instantly and still works offline if the API is unreachable.
+  const [products, setProducts] = useState<CatalogCard[]>(CATALOG_PRODUCTS)
 
-  const filtered = CATALOG_PRODUCTS.filter(p => {
+  useEffect(() => {
+    let cancelled = false
+    fetchCatalog()
+      .then(rows => {
+        if (cancelled || rows.length === 0) return   // empty API → keep mock
+        const mockBySlug = Object.fromEntries(CATALOG_PRODUCTS.map(p => [p.slug, p]))
+        setProducts(rows.map(r => {
+          const mock = mockBySlug[r.slug]
+          const main = r.images.find(i => i.isMain) ?? r.images[0]
+          const image = catalogImageUrl(main?.url) || mock?.image || img('photo-1607082348824-0a96f2a4b9da')
+          return {
+            id: r.id,
+            slug: r.slug,
+            name: r.name,
+            category: r.category?.name ?? mock?.category ?? 'Print',
+            basePrice: Number(r.basePrice) || mock?.basePrice || 0,
+            badge: mock?.badge,                       // badges are marketing-only, not in the DB
+            description: r.description ?? mock?.description ?? '',
+            image,
+            fallback: mock?.fallback || image,
+          }
+        }))
+      })
+      .catch(() => { /* API down → keep the mock list already in state */ })
+    return () => { cancelled = true }
+  }, [])
+
+  // Tabs derive from the categories actually present in the catalog: known ones
+  // keep the curated order, unknown (admin-added) ones are appended alphabetically.
+  const categories = useMemo(() => {
+    const present = Array.from(new Set(products.map(p => p.category).filter(Boolean)))
+    const known = CATEGORY_ORDER.filter(c => present.includes(c))
+    const extra = present.filter(c => !CATEGORY_ORDER.includes(c)).sort()
+    return ['All', ...known, ...extra]
+  }, [products])
+
+  // If the active tab's category disappears (e.g. catalog reload), fall back to All.
+  useEffect(() => {
+    if (activeCategory !== 'All' && !categories.includes(activeCategory)) setActiveCategory('All')
+  }, [categories, activeCategory])
+
+  const filtered = products.filter(p => {
     const matchCat = activeCategory === 'All' || p.category === activeCategory
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
                         p.description.toLowerCase().includes(search.toLowerCase())
@@ -228,7 +283,7 @@ export function CatalogPage() {
               Print Products
             </h1>
             <p style={{ fontSize: 14, color: '#64748B', margin: '6px 0 0', fontFamily: 'system-ui' }}>
-              {CATALOG_PRODUCTS.length} products · UAE studio · 24–48 hr turnaround
+              {products.length} products · UAE studio · 24–48 hr turnaround
             </p>
           </div>
           {/* Search */}
@@ -247,7 +302,7 @@ export function CatalogPage() {
 
         {/* Category tabs */}
         <div style={{ display: 'flex', gap: 0, overflowX: 'auto', scrollbarWidth: 'none' }}>
-          {CATEGORIES.map(cat => (
+          {categories.map(cat => (
             <button key={cat} onClick={() => setActiveCategory(cat)} style={{
               padding: '12px 20px', border: 'none', background: 'transparent', cursor: 'pointer',
               fontSize: 13, fontWeight: 600, fontFamily: 'system-ui', whiteSpace: 'nowrap',

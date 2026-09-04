@@ -217,7 +217,7 @@ export function HomePage() {
   const toolW      = isMobile ? 160 : 220
 
   return (
-    <div style={{ width: '100%', background: '#fff', fontFamily: font, overflowX: 'hidden' }}>
+    <div className="storefront-home" style={{ width: '100%', background: '#fff', color: DARK, fontFamily: font, overflowX: 'hidden' }}>
 
       {/* ── Announcement bar ─────────────────────────────────────────────────── */}
       {!annDismissed && (

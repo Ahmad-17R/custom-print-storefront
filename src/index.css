@@ -168,6 +168,29 @@ body {
   margin: 0;
 }
 
+/* The homepage is intentionally light, while its hero panels are dark.
+   Let headings follow their section instead of the OS-level color scheme. */
+.storefront-home h1,
+.storefront-home h2 {
+  color: inherit;
+}
+
+/* Customer order pages are intentionally light surfaces. Keep their inherited
+   text and controls legible even when the operating system prefers dark mode. */
+.storefront-order-flow {
+  color: #0F172A;
+  color-scheme: light;
+}
+.storefront-order-flow h1,
+.storefront-order-flow h2,
+.storefront-order-flow h3,
+.storefront-order-flow h4 {
+  color: #0F172A;
+}
+.storefront-order-flow a {
+  color: #1D4ED8;
+}
+
 /* ── Admin sidebar scrollbar ─────────────────────────────────────────────── */
 .admin-nav-scroll {
   scrollbar-width: thin;

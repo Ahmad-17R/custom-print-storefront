@@ -7,7 +7,7 @@ const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
 const API_BASE = 'http://localhost:4000'
 
-interface Product { id: string; name: string; slug: string; brandId: string; categoryId: string; isActive: boolean; variantCount: number; createdAt: string }
+interface Product { id: string; name: string; slug: string; brandId: string; categoryId: string; basePrice: number; isActive: boolean; variantCount: number; createdAt: string }
 interface Brand    { id: string; name: string }
 interface Category { id: string; name: string }
 interface ProductImage { id: string; url: string; altText: string | null; sortOrder: number; isMain: boolean }
@@ -16,6 +16,7 @@ const COLS = [
   { key: 'name',         label: 'Product Name' },
   { key: 'brand',        label: 'Brand',    width: 150 },
   { key: 'category',     label: 'Category', width: 150 },
+  { key: 'basePrice',    label: 'Base Price', width: 110 },
   { key: 'isActive',     label: 'Status',   width: 100 },
   { key: 'createdAt',    label: 'Created',  width: 110 },
   { key: 'actions',      label: '',         width: 280 },
@@ -26,7 +27,7 @@ function Modal({ product, brands, categories, onClose, onSave }: {
   brands: Brand[]; categories: Category[]
   onClose: () => void; onSave: () => void
 }) {
-  const [form, setForm] = useState({ name: product?.name ?? '', brandId: product?.brandId ?? brands[0]?.id ?? '', categoryId: product?.categoryId ?? categories[0]?.id ?? '', description: '' })
+  const [form, setForm] = useState({ name: product?.name ?? '', brandId: product?.brandId ?? brands[0]?.id ?? '', categoryId: product?.categoryId ?? categories[0]?.id ?? '', description: '', basePrice: product?.basePrice != null ? String(product.basePrice) : '' })
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   if (product === null) return null
@@ -38,8 +39,16 @@ function Modal({ product, brands, categories, onClose, onSave }: {
     if (!form.categoryId)  return setErr('Select a category')
     setLoading(true)
     try {
-      if (product.id) await api.patch(`/products/${product.id}`, { name: form.name })
-      else            await api.post('/products', form)
+      const basePrice = form.basePrice.trim() === '' ? undefined : Number(form.basePrice)
+      if (product.id) {
+        await api.patch(`/products/${product.id}`, { name: form.name, ...(basePrice !== undefined ? { basePrice } : {}) })
+      } else {
+        await api.post('/products', {
+          name: form.name, brandId: form.brandId, categoryId: form.categoryId,
+          ...(form.description.trim() ? { description: form.description.trim() } : {}),
+          ...(basePrice !== undefined ? { basePrice } : {}),
+        })
+      }
       onSave(); onClose()
     } catch (e: unknown) { setErr(e instanceof Error ? e.message : 'Error') }
     finally { setLoading(false) }
@@ -52,6 +61,10 @@ function Modal({ product, brands, categories, onClose, onSave }: {
         <label style={{ display: 'block', marginBottom: 14 }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 4 }}>Product Name *</span>
           <input value={form.name} onChange={e => f('name', e.target.value)} style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 13, fontFamily: FONT, boxSizing: 'border-box', outline: 'none' }} />
+        </label>
+        <label style={{ display: 'block', marginBottom: 14 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 4 }}>Base Price (AED)</span>
+          <input type="number" min="0" step="0.01" value={form.basePrice} onChange={e => f('basePrice', e.target.value)} placeholder="0.00" style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 13, fontFamily: FONT, boxSizing: 'border-box', outline: 'none' }} />
         </label>
         {!product.id && (
           <label style={{ display: 'block', marginBottom: 14 }}>
@@ -211,6 +224,7 @@ export function ProductsPage() {
     ...p,
     brand:    brandMap[p.brandId] ?? '—',
     category: categoryMap[p.categoryId] ?? '—',
+    basePrice: `AED ${Number(p.basePrice) || 0}`,
     isActive: <Badge label={p.isActive ? 'Active' : 'Inactive'} color={p.isActive ? '#10B981' : '#64748B'} />,
     createdAt: p.createdAt.slice(0, 10),
     actions: (
