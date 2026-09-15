@@ -15,12 +15,13 @@ const fmt = (n: any) => Number(n).toFixed(2)
 
 // ── Interfaces ────────────────────────────────────────────────────────────────
 export interface Customer { id: string; name: string; phone?: string; email?: string; company?: string }
-export interface Product { id: string; name: string }
+export interface Product { id: string; name: string; basePrice?: number | string }
 export interface Supplier { id: string; name: string }
 export interface Material { id: string; name: string; unit: string }
 
-interface SaleItem { id: string; productId: string; productName: string; quantity: number; unitPrice: number; total: number; customization?: string; product?: Product }
-interface Payment  { id: string; amount: number; type: string; method: string; note?: string; paidAt: string }
+interface SaleFieldValue { id: string; fieldLabel: string; displayValue: string; priceModifier: string | number }
+interface SaleItem { id: string; productId: string; productName: string; quantity: number; unitPrice: number; total: number; customization?: string; product?: Product; fieldValues?: SaleFieldValue[] }
+interface Payment  { id: string; amount: number; type: string; method: string; note?: string; paidAt: string; recordedBy?: { name: string } | null }
 interface JobMaterial { id: string; name: string; materialId?: string; quantity: number; unitCost: number; totalCost: number; note?: string }
 interface Job {
   id: string; stepName: string; status: string; sortOrder: number
@@ -36,6 +37,7 @@ export interface Warehouse { id: string; name: string }
 interface Sale {
   id: string; saleNumber: string; status: string; totalAmount: number; advancePaid: number; dueDate?: string; note?: string; createdAt: string
   handlingWarehouseId?: string | null
+  processedBy?: { name: string } | null
   customer: Customer; items: SaleItem[]; payments: Payment[]; jobs: Job[]
   _count: { items: number; payments: number }
 }
@@ -80,6 +82,68 @@ function StepBadge({ status }: { status: string }) {
   return <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: s.bg, color: s.color }}>{s.label}</span>
 }
 
+// ── Per-item configurator fields (mirrors the online product options) ──────────
+interface PField { id: string; label: string; type: string; isRequired: boolean; placeholder?: string | null; options: { id: string; label: string; value: string; priceModifier: string }[] }
+
+function ItemFields({ productId, selections, onChange, onModifierTotal }: { productId: string; selections: Record<string, string | string[]>; onChange: (s: Record<string, string | string[]>) => void; onModifierTotal?: (total: number) => void }) {
+  const [fields, setFields] = useState<PField[] | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    setFields(null)
+    // Always fetch fresh so fields added in the admin appear immediately (no stale cache).
+    api.get<PField[]>(`/products/${productId}/fields`).then(f => { if (!cancelled) setFields(f) }).catch(() => { if (!cancelled) setFields([]) })
+    return () => { cancelled = true }
+  }, [productId])
+
+  // Sum the price modifiers of the currently-selected options and report upward.
+  useEffect(() => {
+    if (!fields || !onModifierTotal) return
+    let total = 0
+    for (const f of fields) {
+      if (!['dropdown', 'radio', 'checkbox'].includes(f.type)) continue
+      const sel = selections[f.id]
+      const vals = Array.isArray(sel) ? sel : sel ? [sel] : []
+      for (const v of vals) { const o = f.options.find(x => x.value === v); if (o) total += Number(o.priceModifier) || 0 }
+    }
+    onModifierTotal(total)
+  }, [fields, selections]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (fields === null) return <div style={{ fontSize: 11, color: '#94A3B8', padding: '4px 0' }}>Loading options…</div>
+  if (fields.length === 0) return null
+  const set = (fid: string, v: string | string[]) => onChange({ ...selections, [fid]: v })
+  const s = (fid: string) => selections[fid]
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8, padding: 10, background: '#fff', border: '1px solid #E2E8F0', borderRadius: 8 }}>
+      {fields.map(f => (
+        <label key={f.id} style={{ fontSize: 11 }}>
+          <span style={{ fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 3 }}>{f.label}{f.isRequired ? ' *' : ''}</span>
+          {(f.type === 'dropdown' || f.type === 'radio') && (
+            <select value={(s(f.id) as string) ?? ''} onChange={e => set(f.id, e.target.value)} style={inp}>
+              <option value="">—</option>
+              {f.options.map(o => <option key={o.id} value={o.value}>{o.label}{Number(o.priceModifier) ? ` (+${o.priceModifier})` : ''}</option>)}
+            </select>
+          )}
+          {f.type === 'checkbox' && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {f.options.map(o => {
+                const arr = Array.isArray(s(f.id)) ? s(f.id) as string[] : []
+                const on = arr.includes(o.value)
+                return <label key={o.id} style={{ display: 'flex', gap: 4, alignItems: 'center', fontWeight: 500 }}><input type="checkbox" checked={on} onChange={() => set(f.id, on ? arr.filter(x => x !== o.value) : [...arr, o.value])} />{o.label}</label>
+              })}
+            </div>
+          )}
+          {f.type === 'textarea' && <textarea value={(s(f.id) as string) ?? ''} onChange={e => set(f.id, e.target.value)} rows={2} placeholder={f.placeholder ?? ''} style={{ ...inp, resize: 'vertical' }} />}
+          {f.type === 'color_picker' && <input type="color" value={(s(f.id) as string) || '#000000'} onChange={e => set(f.id, e.target.value)} style={{ ...inp, height: 34, padding: 3 }} />}
+          {!['dropdown', 'radio', 'checkbox', 'textarea', 'color_picker'].includes(f.type) && (
+            <input type={f.type === 'number' ? 'number' : 'text'} value={(s(f.id) as string) ?? ''} onChange={e => set(f.id, e.target.value)} placeholder={f.placeholder ?? ''} style={inp} />
+          )}
+        </label>
+      ))}
+    </div>
+  )
+}
+
 // ── New Sale Modal ────────────────────────────────────────────────────────────
 function NewSaleModal({ customers, products, onClose, onSaved }: {
   customers: Customer[]; products: Product[]; onClose: () => void; onSaved: () => void
@@ -89,18 +153,31 @@ function NewSaleModal({ customers, products, onClose, onSaved }: {
   const [dueDate,    setDue]      = useState('')
   const [advAmt,     setAdv]      = useState('')
   const [advMethod,  setAdvM]     = useState('cash')
-  const [items,      setItems]    = useState<{ productId: string; quantity: number; unitPrice: number; customization: string }[]>([])
+  const [items,      setItems]    = useState<{ productId: string; quantity: number; unitPrice: number; basePrice: number; customization: string; selections: Record<string, string | string[]> }[]>([])
+  const [discount,   setDiscount] = useState('')
   const [err,        setErr]      = useState('')
   const [saving,     setSaving]   = useState(false)
 
+  const { user, can } = useAuth()
+  const [allowDiscount, setAllowDiscount] = useState(false)
+  useEffect(() => { api.get<{ settings: Record<string, string> }>('/settings').then(r => setAllowDiscount(r.settings?.allowEmployeeDiscount === 'true')).catch(() => {}) }, [])
+  const canDiscount = !!user?.isOwner || (allowDiscount && can('feature.discounts')) || allowDiscount
+
+  const priceOf = (pid: string) => Number(products.find(p => p.id === pid)?.basePrice ?? 0) || 0
   const addItem = () => {
     const pid = products.find(p => !items.find(i => i.productId === p.id))?.id ?? products[0]?.id
-    if (pid) setItems(prev => [...prev, { productId: pid, quantity: 1, unitPrice: 0, customization: '' }])
+    if (pid) setItems(prev => [...prev, { productId: pid, quantity: 1, unitPrice: priceOf(pid), basePrice: priceOf(pid), customization: '', selections: {} }])
   }
   const removeItem = (idx: number) => setItems(p => p.filter((_, i) => i !== idx))
   const setItem = (idx: number, key: string, val: any) => setItems(p => p.map((it, i) => i === idx ? { ...it, [key]: val } : it))
+  // Product changed → reset price/selections to the new product's base price.
+  const changeProduct = (idx: number, pid: string) => setItems(p => p.map((it, i) => i === idx ? { ...it, productId: pid, basePrice: priceOf(pid), unitPrice: priceOf(pid), selections: {} } : it))
+  // Selected options changed → unit price = base price + option modifiers.
+  const setModifiers = (idx: number, modTotal: number) => setItems(p => p.map((it, i) => i === idx ? { ...it, unitPrice: Math.round((it.basePrice + modTotal) * 100) / 100 } : it))
 
-  const total = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0)
+  const subtotal = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0)
+  const discountVal = Math.max(0, Math.min(subtotal, parseFloat(discount) || 0))
+  const total = Math.round((subtotal - discountVal) * 100) / 100
   const advance = parseFloat(advAmt) || 0
 
   const save = async () => {
@@ -109,7 +186,11 @@ function NewSaleModal({ customers, products, onClose, onSaved }: {
     if (items.some(i => i.unitPrice <= 0)) return setErr('Set price for all items')
     setSaving(true)
     try {
-      await api.post('/walk-in-sales', { customerId, note, dueDate, advanceAmount: advance, advanceMethod: advMethod, items })
+      const payload = items.map(i => ({
+        productId: i.productId, quantity: i.quantity, unitPrice: i.unitPrice, customization: i.customization,
+        selections: Object.entries(i.selections).filter(([, v]) => v != null && v !== '' && !(Array.isArray(v) && v.length === 0)).map(([fieldId, value]) => ({ fieldId, value })),
+      }))
+      await api.post('/walk-in-sales', { customerId, note, dueDate, advanceAmount: advance, advanceMethod: advMethod, discount: canDiscount ? discountVal : 0, items: payload })
       onSaved(); onClose()
     } catch (e: any) { setErr(e.message ?? 'Error') }
     finally { setSaving(false) }
@@ -142,10 +223,11 @@ function NewSaleModal({ customers, products, onClose, onSaved }: {
             <Btn label="+ Add Product" variant="secondary" onClick={addItem} />
           </div>
           {items.length === 0 && <div style={{ textAlign: 'center', padding: '16px 0', color: '#94A3B8', fontSize: 13 }}>No products yet</div>}
+          <div style={{ maxHeight: 300, overflowY: 'auto', paddingRight: 4 }}>
           {items.map((it, idx) => (
             <div key={idx} style={{ background: '#F8FAFC', borderRadius: 10, padding: '12px 14px', marginBottom: 8, border: '1px solid #F1F5F9' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 90px', gap: 8, marginBottom: 8 }}>
-                <select value={it.productId} onChange={e => setItem(idx, 'productId', e.target.value)} style={inp}>
+                <select value={it.productId} onChange={e => changeProduct(idx, e.target.value)} style={inp}>
                   {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
                 <input type="number" min={1} value={it.quantity} onChange={e => setItem(idx, 'quantity', Number(e.target.value))} placeholder="Qty" style={inp} />
@@ -155,9 +237,22 @@ function NewSaleModal({ customers, products, onClose, onSaved }: {
                 <input value={it.customization} onChange={e => setItem(idx, 'customization', e.target.value)} placeholder="Customization notes…" style={{ ...inp, flex: 1 }} />
                 <button onClick={() => removeItem(idx)} style={{ border: 'none', background: '#FEE2E2', color: '#DC2626', borderRadius: 8, padding: '0 12px', cursor: 'pointer', fontSize: 16 }}>×</button>
               </div>
+              <ItemFields productId={it.productId} selections={it.selections} onChange={sel => setItem(idx, 'selections', sel)} onModifierTotal={t => setModifiers(idx, t)} />
             </div>
           ))}
+          </div>
         </div>
+
+        {/* Discount (owner-gated) */}
+        {canDiscount && (
+          <div style={{ background: '#FFFBEB', borderRadius: 10, padding: 14, marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label style={{ fontSize: 13, fontWeight: 700, color: '#92400E' }}>Discount (AED)</label>
+              <input type="number" min={0} step="0.01" value={discount} onChange={e => setDiscount(e.target.value)} placeholder="0.00" style={{ ...inp, width: 140 }} />
+            </div>
+            {discountVal > 0 && <div style={{ fontSize: 11, color: '#92400E', marginTop: 6 }}>Subtotal AED {fmt(subtotal)} − discount AED {fmt(discountVal)} = <strong>AED {fmt(total)}</strong></div>}
+          </div>
+        )}
 
         {/* Advance payment */}
         <div style={{ background: '#F0FDF4', borderRadius: 10, padding: 14, marginBottom: 16 }}>
@@ -704,7 +799,8 @@ export function SaleDrawer({ saleId, suppliers, materials, products, warehouses,
   const warehouseName = warehouses.find(w => w.id === sale.handlingWarehouseId)?.name ?? '—'
 
   // Gate: must choose a handling warehouse before doing anything
-  if (!sale.handlingWarehouseId) {
+  // Zero-job orders have nothing to handle → skip the warehouse gate entirely.
+  if (!sale.handlingWarehouseId && sale.jobs.length > 0) {
     return (
       <>
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 899 }} onClick={onClose} />
@@ -728,6 +824,25 @@ export function SaleDrawer({ saleId, suppliers, materials, products, warehouses,
               {whSaving ? 'Setting…' : 'Start Handling'}
             </button>
           </div>
+          {/* Items & specifications — visible before handling starts */}
+          <div style={{ marginTop: 28, textAlign: 'left' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: DARK, marginBottom: 8 }}>Items &amp; specifications</div>
+            {sale.items.map(item => (
+              <div key={item.id} style={{ border: '1px solid #E2E8F0', borderRadius: 9, padding: 11, marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                  <strong>{item.productName} × {item.quantity}</strong>
+                  <strong>AED {fmt(Number(item.total))}</strong>
+                </div>
+                {item.fieldValues?.filter(f => f.displayValue).map(f => (
+                  <div key={f.id} style={{ fontSize: 12, marginTop: 4 }}>
+                    <span style={{ color: '#64748B' }}>{f.fieldLabel}:</span> {f.displayValue}
+                    {Number(f.priceModifier) !== 0 && <span style={{ color: '#1D4ED8' }}> (+{fmt(Number(f.priceModifier))})</span>}
+                  </div>
+                ))}
+                {item.customization && <div style={{ fontSize: 12, marginTop: 4, color: '#64748B' }}>Notes: {item.customization}</div>}
+              </div>
+            ))}
+          </div>
         </div>
       </>
     )
@@ -735,16 +850,21 @@ export function SaleDrawer({ saleId, suppliers, materials, products, warehouses,
 
   const balance   = Number(sale.totalAmount) - Number(sale.advancePaid)
   const jobCosts  = sale.jobs.reduce((s, j) => s + Number(j.supplierCost ?? 0), 0)
-  const nextStatus     = STATUS_FLOW[STATUS_FLOW.indexOf(sale.status) + 1]
+  const totalJobs      = sale.jobs.length
+  const hasJobs        = totalJobs > 0
+  const doneJobs       = sale.jobs.filter(j => j.status === 'done').length
   const isFullyPaid    = Number(sale.advancePaid) >= Number(sale.totalAmount)
 
-  // Ready-for-pickup requires every job (all products) to be done
-  const totalJobs      = sale.jobs.length
-  const doneJobs       = sale.jobs.filter(j => j.status === 'done').length
-  const jobsIncomplete = nextStatus === 'ready_for_pickup' && totalJobs > 0 && doneJobs < totalJobs
+  // No-job orders (e.g. simple over-the-counter items) have no production stage —
+  // staff advance them straight to Ready for Pickup by hand.
+  let nextStatus       = STATUS_FLOW[STATUS_FLOW.indexOf(sale.status) + 1]
+  if (!hasJobs && sale.status === 'confirmed') nextStatus = 'ready_for_pickup'
 
-  // These transitions are driven automatically by job progress — never pressed by hand
-  const autoStatus      = nextStatus === 'in_production' || nextStatus === 'ready_for_pickup'
+  // Ready-for-pickup requires every job (all products) to be done
+  const jobsIncomplete = nextStatus === 'ready_for_pickup' && hasJobs && doneJobs < totalJobs
+
+  // Production transitions are automatic ONLY when there are jobs to drive them.
+  const autoStatus      = hasJobs && (nextStatus === 'in_production' || nextStatus === 'ready_for_pickup')
   const autoReason      = nextStatus === 'in_production'
     ? 'Starts automatically when a worker begins a job'
     : `Happens automatically when all jobs are done (${doneJobs}/${totalJobs} done)`
@@ -784,6 +904,7 @@ export function SaleDrawer({ saleId, suppliers, materials, products, warehouses,
               {sale.customer.phone && <> · {sale.customer.phone}</>}
               {sale.customer.company && <> · {sale.customer.company}</>}
             </div>
+            {sale.processedBy && <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 2 }}>Created by {sale.processedBy.name}</div>}
             <div style={{ marginTop: 6 }}><StatusPill status={sale.status} /></div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -829,6 +950,27 @@ export function SaleDrawer({ saleId, suppliers, materials, products, warehouses,
               {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
             </select>
           )}
+        </div>
+
+        {/* Items & specifications */}
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid #F1F5F9' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: DARK, marginBottom: 8 }}>Items &amp; specifications</div>
+          {sale.items.map(item => (
+            <div key={item.id} style={{ border: '1px solid #E2E8F0', borderRadius: 9, padding: 11, marginBottom: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                <strong>{item.productName} × {item.quantity}</strong>
+                <strong>AED {fmt(Number(item.total))}</strong>
+              </div>
+              <div style={{ color: '#94A3B8', fontSize: 11 }}>AED {fmt(Number(item.unitPrice))} each</div>
+              {item.fieldValues?.filter(f => f.displayValue).map(f => (
+                <div key={f.id} style={{ fontSize: 12, marginTop: 4 }}>
+                  <span style={{ color: '#64748B' }}>{f.fieldLabel}:</span> {f.displayValue}
+                  {Number(f.priceModifier) !== 0 && <span style={{ color: '#1D4ED8' }}> (+{fmt(Number(f.priceModifier))})</span>}
+                </div>
+              ))}
+              {item.customization && <div style={{ fontSize: 12, marginTop: 4, color: '#64748B' }}>Notes: {item.customization}</div>}
+            </div>
+          ))}
         </div>
 
         {/* Status actions */}
@@ -974,7 +1116,7 @@ export function SaleDrawer({ saleId, suppliers, materials, products, warehouses,
                   <div>
                     <div style={{ fontSize: 12, fontWeight: 600, color: DARK, textTransform: 'capitalize' }}>{p.type} · {p.method.replace('_', ' ')}</div>
                     {p.note && <div style={{ fontSize: 11, color: '#64748B' }}>{p.note}</div>}
-                    <div style={{ fontSize: 11, color: '#94A3B8' }}>{new Date(p.paidAt).toLocaleDateString()}</div>
+                    <div style={{ fontSize: 11, color: '#94A3B8' }}>{new Date(p.paidAt).toLocaleDateString()}{p.recordedBy ? ` · by ${p.recordedBy.name}` : ''}</div>
                   </div>
                   <div style={{ fontWeight: 700, fontSize: 14, color: GREEN }}>AED {fmt(Number(p.amount))}</div>
                 </div>

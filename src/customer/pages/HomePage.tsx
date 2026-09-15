@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useCart } from '../../context/CartContext'
+import { fetchCatalog, fetchCatalogCategories, fetchStorefront, catalogImageUrl } from '../../lib/api'
+import type { StorefrontSettings } from '../../lib/api'
 
 // ── Responsive hook ───────────────────────────────────────────────────────────
 function useWindowWidth() {
@@ -62,21 +64,6 @@ const u = (id: string, w = 600, h = 400) =>
   `https://images.unsplash.com/${id}?w=${w}&h=${h}&q=80&auto=format&fit=crop`
 
 // ── Data ──────────────────────────────────────────────────────────────────────
-const NAV_LINKS = [
-  { label: 'Deals', accent: AMBER },
-  { label: 'Business Cards',               slug: '/products/business-cards' },
-  { label: 'Postcards & Print Advertising', slug: '/catalog' },
-  { label: 'Signs, Banners & Posters',     slug: '/catalog' },
-  { label: 'Stickers & Labels',            slug: '/products/stickers' },
-  { label: 'Clothing & Bags',              slug: '/catalog' },
-  { label: 'Promotional Products',         slug: '/catalog' },
-  { label: 'Packaging',                    slug: '/catalog' },
-  { label: 'Notebooks & Stationery',       slug: '/catalog' },
-  { label: 'Envelopes',                    slug: '/products/envelopes' },
-  { label: 'Logo & Design Services',       slug: '/catalog' },
-  { label: 'Design Services',              slug: '/editor' },
-]
-
 const HERO_IMAGES = [
   u('photo-1607082348824-0a96f2a4b9da', 400, 360),
   u('photo-1521572163474-6864f9cf17ab', 400, 360),
@@ -108,34 +95,6 @@ const TRUST_ITEMS = [
   { icon: 'star',  title: 'Over 18,000 5-star reviews', sub: 'Rated by Trustpilot users' },
   { icon: 'pen',   title: 'Create with confidence',      sub: 'Design it yourself, or with help' },
   { icon: 'truck', title: 'Fast delivery across UAE',    sub: 'Pick the speed, get it on time' },
-]
-
-const CATEGORIES = [
-  { name: 'Business Cards',          img: u('photo-1607082348824-0a96f2a4b9da', 220, 160), slug: '/products/business-cards' },
-  { name: 'Postcards & Advertising', img: u('photo-1561070791-2526d30994b5',    220, 160), slug: '/catalog' },
-  { name: 'Signs, Banners & Posters',img: u('photo-1540575467063-178a50c2df87', 220, 160), slug: '/catalog' },
-  { name: 'Stickers & Labels',       img: u('photo-1572375992501-4b0892d50c69', 220, 160), slug: '/products/stickers' },
-  { name: 'Clothing & Bags',         img: u('photo-1521572163474-6864f9cf17ab', 220, 160), slug: '/catalog' },
-  { name: 'Promotional Products',    img: u('photo-1583485088034-697b5bc54ccd', 220, 160), slug: '/catalog' },
-  { name: 'Packaging',               img: u('photo-1600275669439-14e40452d20b', 220, 160), slug: '/catalog' },
-  { name: 'Booklets & Catalogues',   img: u('photo-1543269865-cbf427effbad',    220, 160), slug: '/catalog' },
-  { name: 'Notebooks & Stationery',  img: u('photo-1544816155-12df9643f363',    220, 160), slug: '/products/notebooks' },
-  { name: 'Envelopes',               img: u('photo-1596526131083-e8c633c948d2', 220, 160), slug: '/products/envelopes' },
-  { name: 'Flyers & Leaflets',       img: u('photo-1586281380349-632531db7ed4', 220, 160), slug: '/products/flyers' },
-  { name: 'Brochures',               img: u('photo-1497366811353-6870744d04b2', 220, 160), slug: '/products/brochures' },
-]
-
-const POPULAR_ITEMS = [
-  { name: 'Custom Business Cards',  price: 'From AED 49',  sub: 'AED 0.49 each / 100 units', img: u('photo-1607082348824-0a96f2a4b9da', 260, 200), slug: '/products/business-cards' },
-  { name: 'Company Letterhead',     price: 'From AED 89',  sub: 'AED 0.36 each / 250 units', img: u('photo-1586281380349-632531db7ed4', 260, 200), slug: '/products/letterhead' },
-  { name: 'Roll-Up Banners',        price: 'From AED 220', sub: '85×200 cm, includes stand',  img: u('photo-1540575467063-178a50c2df87', 260, 200), slug: '/products/rollup-banners' },
-  { name: 'Branded Notebooks',      price: 'From AED 95',  sub: 'A5 hardcover, min 25 units', img: u('photo-1544816155-12df9643f363',    260, 200), slug: '/products/notebooks' },
-  { name: 'Stickers & Labels',      price: 'From AED 28',  sub: 'AED 0.28 each / 100 units', img: u('photo-1572375992501-4b0892d50c69', 260, 200), slug: '/products/stickers' },
-  { name: 'Branded Pens',           price: 'From AED 15',  sub: 'Minimum quantity 50',        img: u('photo-1583485088034-697b5bc54ccd', 260, 200), slug: '/catalog' },
-  { name: 'Flyers',                 price: 'From AED 55',  sub: 'A5 glossy, min 100 units',   img: u('photo-1561070791-2526d30994b5',    260, 200), slug: '/products/flyers' },
-  { name: 'Brochures',              price: 'From AED 120', sub: 'Tri-fold, min 50 units',     img: u('photo-1497366811353-6870744d04b2', 260, 200), slug: '/products/brochures' },
-  { name: 'Branded Envelopes',      price: 'From AED 65',  sub: 'DL size, min 100 units',     img: u('photo-1596526131083-e8c633c948d2', 260, 200), slug: '/products/envelopes' },
-  { name: 'Custom Packaging',       price: 'From AED 180', sub: 'Min 50 units',               img: u('photo-1600275669439-14e40452d20b', 260, 200), slug: '/catalog' },
 ]
 
 const COLLECTIONS = [
@@ -197,10 +156,107 @@ export function HomePage() {
   const { user, signOut } = useAuth()
   const { count } = useCart()
   const [search,       setSearch]       = useState('')
+  const [searchFocused, setSearchFocused] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
   const [annDismissed, setAnnDismissed] = useState(false)
   const [menuOpen,     setMenuOpen]     = useState(false)
   const year  = new Date().getFullYear()
   const width = useWindowWidth()
+
+  // Live catalog — powers the "most popular products" row AND the free-text search
+  // dropdown. Only real admin-managed products (no demo data).
+  type SearchItem = { name: string; category: string; price: string; img: string; slug: string }
+  const [searchItems, setSearchItems] = useState<SearchItem[]>([])
+  useEffect(() => {
+    let cancelled = false
+    fetchCatalog()
+      .then(rows => {
+        if (cancelled) return
+        setSearchItems(rows.map(r => {
+          const main = r.images.find(i => i.isMain) ?? r.images[0]
+          const price = Number(r.basePrice) || 0
+          return {
+            name: r.name,
+            category: r.category?.name ?? 'Custom print',
+            price: price > 0 ? `From AED ${price}` : 'Get a quote',
+            img: catalogImageUrl(main?.url) || u('photo-1607082348824-0a96f2a4b9da', 260, 200),
+            slug: `/products/${r.slug}`,
+          }
+        }))
+      })
+      .catch(() => { if (!cancelled) setSearchItems([]) })
+    return () => { cancelled = true }
+  }, [])
+
+  // Admin-editable storefront content (announcement, promo, hero, collections…).
+  const [sf, setSf] = useState<StorefrontSettings | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    fetchStorefront().then(s => { if (!cancelled) setSf(s) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
+  // Featured "most popular" row: admin-picked products if any, else first 12.
+  const featuredSlugs = sf?.featured.productSlugs ?? []
+  const popular = (featuredSlugs.length
+    ? featuredSlugs.map(slug => searchItems.find(p => p.slug === `/products/${slug}`)).filter((p): p is SearchItem => !!p)
+    : searchItems.slice(0, 12)
+  ).map(m => ({ name: m.name, price: m.price, sub: m.category, img: m.img, slug: m.slug }))
+
+  // Resolved storefront content — admin settings when present, else built-in defaults.
+  const announcementOn = sf ? sf.announcement.enabled : true
+  const announcementText = sf?.announcement.text
+  const promoOn = sf ? sf.promo.enabled : true
+  const heroImages = sf && sf.hero.images.length ? sf.hero.images.map(catalogImageUrl) : HERO_IMAGES
+  const heroHeadline = sf?.hero.headline ?? 'If you need it, we print it.'
+  const heroSubtext  = sf?.hero.subtext ?? "From branded business products to beautiful corporate gifts — we've got the product for you. Easy-to-use design tools and same-week delivery across UAE."
+  const heroTagline  = sf?.hero.tagline ?? 'Try our top products starting at just AED 35 each'
+  const heroPrimaryLabel   = sf?.hero.primaryLabel ?? 'Shop from AED 35'
+  const heroPrimaryHref    = sf?.hero.primaryHref ?? '/catalog'
+  const heroSecondaryLabel = sf?.hero.secondaryLabel ?? 'Design Studio'
+  const heroSecondaryHref  = sf?.hero.secondaryHref ?? '/editor'
+  const featuredTitle = sf?.featured.title ?? 'Our most popular products'
+  const collectionsOn = sf ? sf.collections.enabled : true
+  const collectionItems = sf && sf.collections.items.length
+    ? sf.collections.items.map(i => ({ name: i.title, img: catalogImageUrl(i.image) || u('photo-1607082348824-0a96f2a4b9da', 260, 180), slug: i.href || '/catalog' }))
+    : COLLECTIONS
+  const mustHavesOn = sf ? sf.mustHaves.enabled : true
+  const mustHaveItems = sf && sf.mustHaves.items.length
+    ? sf.mustHaves.items.map(i => ({ name: i.title, img: catalogImageUrl(i.image) || u('photo-1607082348824-0a96f2a4b9da', 260, 180), slug: i.href || '/catalog' }))
+    : MUST_HAVES
+  const toolsOn = sf ? sf.tools.enabled : true
+  const galleryOn = sf ? sf.gallery.enabled : true
+  const contactPhone = sf?.contact.phone ?? '+971 4 000 0000'
+  const DEFAULT_WEB_BANNER = { enabled: true, eyebrow: 'MyPrintingWorld · Web & IT', headline: 'Need a website for your business?', text: "We don't just print — our in-house team builds fast, modern business websites, online stores and booking systems. From your logo to your domain, we get you online.", features: ['Business websites', 'Online stores', 'Hosting & domains'], ctaLabel: 'Book a free consultation', ctaHref: '', secondaryLabel: 'See our work', secondaryHref: '/catalog' }
+  const webBanner = sf?.webBanner ?? DEFAULT_WEB_BANNER
+  const webBannerOn = sf ? sf.webBanner.enabled : true
+
+  // Free-text matches for the search dropdown (name or category), capped at 8.
+  const q = search.trim().toLowerCase()
+  const searchMatches = q
+    ? searchItems.filter(p => p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)).slice(0, 8)
+    : []
+  const showSearchResults = searchFocused && q.length > 0
+
+  // Categories from the real DB — powers both the nav strip under the search bar
+  // and the "Explore all categories" image tiles.
+  const [navCategories, setNavCategories] = useState<{ label: string; slug: string }[]>([])
+  const [categoryTiles, setCategoryTiles] = useState<{ name: string; img: string; slug: string }[]>([])
+  useEffect(() => {
+    let cancelled = false
+    fetchCatalogCategories()
+      .then(cats => {
+        if (cancelled) return
+        setNavCategories(cats.map(c => ({ label: c.name, slug: `/catalog?category=${encodeURIComponent(c.name)}` })))
+        setCategoryTiles(cats.map(c => ({
+          name: c.name,
+          img: catalogImageUrl(c.imageUrl) || u('photo-1607082348824-0a96f2a4b9da', 220, 160),
+          slug: `/catalog?category=${encodeURIComponent(c.name)}`,
+        })))
+      })
+      .catch(() => { if (!cancelled) { setNavCategories([]); setCategoryTiles([]) } })
+    return () => { cancelled = true }
+  }, [])
 
   const isMobile = width < 640
   const isTablet = width >= 640 && width < 1024
@@ -220,12 +276,12 @@ export function HomePage() {
     <div className="storefront-home" style={{ width: '100%', background: '#fff', color: DARK, fontFamily: font, overflowX: 'hidden' }}>
 
       {/* ── Announcement bar ─────────────────────────────────────────────────── */}
-      {!annDismissed && (
+      {announcementOn && !annDismissed && (
         <div style={{ background: DARK, color: '#fff', fontSize: isMobile ? 11 : 12, padding: `8px ${px}px`, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, position: 'relative' }}>
           <span style={{ textAlign: 'center', paddingRight: 24 }}>
-            {isMobile
+            {announcementText ?? (isMobile
               ? 'Quality printing across all 7 Emirates.'
-              : 'You are viewing the UAE website. Quality printing delivered across all seven Emirates.'}
+              : 'You are viewing the UAE website. Quality printing delivered across all seven Emirates.')}
           </span>
           <span style={{ position: 'absolute', right: px, cursor: 'pointer', fontSize: 15 }} onClick={() => setAnnDismissed(true)}>✕</span>
         </div>
@@ -237,7 +293,7 @@ export function HomePage() {
           <Link to="/catalog" style={{ color: '#555', textDecoration: 'none' }}>All Products</Link>
           <Link to="/catalog" style={{ color: '#555', textDecoration: 'none' }}>Corporate Pricing</Link>
           <Link to="/editor"  style={{ color: '#555', textDecoration: 'none' }}>Design Studio</Link>
-          <a href="tel:+97140000000" style={{ color: '#555', textDecoration: 'none' }}>+971 4 000 0000</a>
+          <a href="tel:+97140000000" style={{ color: '#555', textDecoration: 'none' }}>{contactPhone}</a>
         </div>
       )}
 
@@ -250,32 +306,99 @@ export function HomePage() {
           </div>
         </Link>
 
-        {/* Search — full width on its own row on mobile */}
-        <div style={{ flex: 1, display: 'flex', minWidth: isMobile ? '100%' : 200, order: isMobile ? 3 : 0 }}>
-          <input
-            type="text" value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search for products…"
-            onKeyDown={e => { if (e.key === 'Enter' && search.trim()) navigate('/catalog') }}
-            style={{ flex: 1, border: '1.5px solid #ccc', borderRight: 'none', padding: '9px 12px', borderRadius: '4px 0 0 4px', fontSize: 14, fontFamily: font, outline: 'none' }}
-          />
-          <button
-            onClick={() => navigate('/catalog')}
-            style={{ background: DARK, color: '#fff', border: 'none', borderRadius: '0 4px 4px 0', padding: '0 14px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          </button>
+        {/* Search — free-text with a live results dropdown */}
+        <div style={{ flex: 1, position: 'relative', minWidth: isMobile ? '100%' : 200, order: isMobile ? 3 : 0 }}>
+          <div style={{ display: 'flex' }}>
+            <input
+              type="text" value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Search for products…"
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && search.trim()) { setSearchFocused(false); navigate(`/catalog?q=${encodeURIComponent(search.trim())}`) }
+                if (e.key === 'Escape') setSearchFocused(false)
+              }}
+              style={{ flex: 1, border: '1.5px solid #ccc', borderRight: 'none', padding: '9px 12px', borderRadius: '4px 0 0 4px', fontSize: 14, fontFamily: font, outline: 'none' }}
+            />
+            <button
+              onClick={() => { if (search.trim()) navigate(`/catalog?q=${encodeURIComponent(search.trim())}`) }}
+              style={{ background: DARK, color: '#fff', border: 'none', borderRadius: '0 4px 4px 0', padding: '0 14px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </button>
+          </div>
+
+          {showSearchResults && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 6, background: '#fff', border: '1px solid #E2E8F0', borderRadius: 10, boxShadow: '0 12px 32px rgba(0,0,0,0.14)', zIndex: 50, overflow: 'hidden', maxHeight: 400, overflowY: 'auto' }}>
+              {searchMatches.length === 0 ? (
+                <div style={{ padding: '14px 16px', fontSize: 13, color: '#64748B' }}>No products match “{search.trim()}”.</div>
+              ) : (
+                <>
+                  {searchMatches.map(m => (
+                    <div key={m.slug}
+                      onMouseDown={e => { e.preventDefault(); setSearch(''); setSearchFocused(false); navigate(m.slug) }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid #F1F5F9' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = '#F8FAFC' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = '#fff' }}>
+                      <img src={m.img} alt="" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 6, flexShrink: 0, background: '#F1F5F9' }}
+                        onError={e => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden' }} />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: DARK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.name}</div>
+                        <div style={{ fontSize: 11, color: '#64748B' }}>{m.category} · {m.price}</div>
+                      </div>
+                    </div>
+                  ))}
+                  <div onMouseDown={e => { e.preventDefault(); setSearchFocused(false); navigate(`/catalog?q=${encodeURIComponent(search.trim())}`) }}
+                    style={{ padding: '10px 14px', fontSize: 12, fontWeight: 600, color: BLUE, cursor: 'pointer', textAlign: 'center' }}>
+                    See all results for “{search.trim()}” →
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 14 : 20, fontSize: 12, marginLeft: 'auto' }}>
           {!isMobile && (
             <div style={{ lineHeight: 1.4, whiteSpace: 'nowrap' }}>
-              Help is here<br /><strong style={{ fontSize: 13 }}>+971 4 000 0000</strong>
+              Help is here<br /><strong style={{ fontSize: 13 }}>{contactPhone}</strong>
             </div>
           )}
           {user ? (
-            <button onClick={() => signOut()} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 12, color: DARK, fontFamily: font }}>
-              Sign out
-            </button>
+            <div style={{ position: 'relative' }}>
+              <button onClick={() => setProfileOpen(o => !o)} onBlur={() => setTimeout(() => setProfileOpen(false), 150)}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, padding: 0 }}>
+                <span style={{ width: 32, height: 32, borderRadius: '50%', background: BLUE, color: '#fff', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: font }}>
+                  {(((user.user_metadata?.full_name ?? user.user_metadata?.name ?? user.email ?? '?') as string).trim()[0] ?? '?').toUpperCase()}
+                </span>
+                {!isMobile && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={DARK} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>}
+              </button>
+              {profileOpen && (
+                <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 8, background: '#fff', border: '1px solid #E2E8F0', borderRadius: 10, boxShadow: '0 12px 32px rgba(0,0,0,0.14)', zIndex: 60, minWidth: 190, overflow: 'hidden' }}>
+                  <div style={{ padding: '10px 14px', borderBottom: '1px solid #F1F5F9' }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: DARK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{(user.user_metadata?.full_name ?? user.user_metadata?.name ?? 'My account') as string}</div>
+                    <div style={{ fontSize: 11, color: '#94A3B8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.email}</div>
+                  </div>
+                  {[
+                    { label: 'My Orders', href: '/orders' },
+                    { label: 'Account Settings', href: '/account' },
+                  ].map(it => (
+                    <div key={it.label} onMouseDown={e => { e.preventDefault(); setProfileOpen(false); navigate(it.href) }}
+                      style={{ padding: '10px 14px', fontSize: 13, color: DARK, cursor: 'pointer' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = '#F8FAFC' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = '#fff' }}>
+                      {it.label}
+                    </div>
+                  ))}
+                  <div onMouseDown={async e => { e.preventDefault(); setProfileOpen(false); await signOut() }}
+                    style={{ padding: '10px 14px', fontSize: 13, color: '#EF4444', fontWeight: 600, cursor: 'pointer', borderTop: '1px solid #F1F5F9' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = '#FEF2F2' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = '#fff' }}>
+                    Sign out
+                  </div>
+                </div>
+              )}
+            </div>
           ) : (
             <button
               onClick={() => navigate('/login')}
@@ -305,10 +428,10 @@ export function HomePage() {
       {/* ── Mobile nav drawer ────────────────────────────────────────────────── */}
       {isMobile && menuOpen && (
         <div style={{ background: '#fff', borderTop: '1px solid #eee', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {NAV_LINKS.map(link => (
-            <Link key={link.label} to={link.slug ?? '/catalog'}
+          {navCategories.map(link => (
+            <Link key={link.label} to={link.slug}
               onClick={() => setMenuOpen(false)}
-              style={{ color: link.accent ?? DARK, fontWeight: 500, textDecoration: 'none', fontSize: 14, padding: '4px 0' }}>
+              style={{ color: DARK, fontWeight: 500, textDecoration: 'none', fontSize: 14, padding: '4px 0' }}>
               {link.label}
             </Link>
           ))}
@@ -316,15 +439,15 @@ export function HomePage() {
           <Link to="/catalog" onClick={() => setMenuOpen(false)} style={{ color: '#555', textDecoration: 'none', fontSize: 13 }}>All Products</Link>
           <Link to="/catalog" onClick={() => setMenuOpen(false)} style={{ color: '#555', textDecoration: 'none', fontSize: 13 }}>Corporate Pricing</Link>
           <Link to="/editor"  onClick={() => setMenuOpen(false)} style={{ color: '#555', textDecoration: 'none', fontSize: 13 }}>Design Studio</Link>
-          <a href="tel:+97140000000" style={{ color: '#555', textDecoration: 'none', fontSize: 13 }}>+971 4 000 0000</a>
+          <a href="tel:+97140000000" style={{ color: '#555', textDecoration: 'none', fontSize: 13 }}>{contactPhone}</a>
         </div>
       )}
 
-      {/* ── Category nav bar (desktop/tablet only) ───────────────────────────── */}
-      {!isMobile && (
+      {/* ── Category nav bar (desktop/tablet only) — real DB categories ──────── */}
+      {!isMobile && navCategories.length > 0 && (
         <div style={{ padding: `0 ${px}px 12px`, display: 'flex', gap: 20, fontSize: 13, borderBottom: '1px solid #eee', overflowX: 'auto', whiteSpace: 'nowrap' }}>
-          {NAV_LINKS.map(link => (
-            <Link key={link.label} to={link.slug ?? '/catalog'} style={{ color: link.accent ?? DARK, fontWeight: 500, textDecoration: 'none', flexShrink: 0 }}>
+          {navCategories.map(link => (
+            <Link key={link.label} to={link.slug} style={{ color: DARK, fontWeight: 500, textDecoration: 'none', flexShrink: 0 }}>
               {link.label}
             </Link>
           ))}
@@ -332,35 +455,43 @@ export function HomePage() {
       )}
 
       {/* ── Promo banner ─────────────────────────────────────────────────────── */}
+      {promoOn && (
       <div style={{ background: DARK, color: '#fff', padding: `8px ${px}px`, fontSize: isMobile ? 11 : 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <div style={{ flex: 1 }}>
-          {isMobile
+          {sf ? (
+            <>
+              <strong>{sf.promo.text}{sf.promo.code ? ` | Code: ${sf.promo.code}` : ''}</strong>
+              {!isMobile && sf.promo.detail ? ` | ${sf.promo.detail}` : ''}
+              {!isMobile && sf.promo.ctaLabel ? <>{' | '}<Link to={sf.promo.ctaHref || '/catalog'} style={{ color: '#fff', textDecoration: 'underline' }}>{sf.promo.ctaLabel}</Link></> : ''}
+            </>
+          ) : isMobile
             ? <><strong>AED 220 off orders AED 730+</strong> | Code: MPW30</>
             : <><strong>Buy More, Save More: AED 220 off orders AED 730+ | Code: MPW30</strong>{' | '}Ends Aug 31 | <Link to="/catalog" style={{ color: '#fff', textDecoration: 'underline' }}>Offer details</Link>{' | '}<Link to="/catalog" style={{ color: '#fff', textDecoration: 'underline' }}>Save now</Link></>
           }
         </div>
         <span>›</span>
       </div>
+      )}
 
       {/* ── Hero ─────────────────────────────────────────────────────────────── */}
       {isMobile ? (
         /* Mobile: image strip on top, CTA block below — no absolute overlay */
         <div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', height: 140 }}>
-            {HERO_IMAGES.slice(0, 3).map((src, i) => (
+            {heroImages.slice(0, 3).map((src, i) => (
               <img key={i} src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                 onError={e => { (e.currentTarget as HTMLImageElement).style.background = '#e2e8f0' }} />
             ))}
           </div>
           <div style={{ background: DARK, color: '#fff', padding: '24px 16px', textAlign: 'center' }}>
-            <h1 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px', fontFamily: font }}>If you need it, we print it.</h1>
-            <p style={{ fontSize: 12, margin: '0 0 14px', opacity: 0.85 }}>Top products starting at just AED 35 each</p>
+            <h1 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px', fontFamily: font }}>{heroHeadline}</h1>
+            <p style={{ fontSize: 12, margin: '0 0 14px', opacity: 0.85 }}>{heroTagline}</p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-              <button onClick={() => navigate('/catalog')} style={{ background: '#fff', color: DARK, border: 'none', padding: '9px 18px', fontSize: 12, borderRadius: 12, cursor: 'pointer', fontFamily: font, fontWeight: 600 }}>
-                Shop from AED 35
+              <button onClick={() => navigate(heroPrimaryHref)} style={{ background: '#fff', color: DARK, border: 'none', padding: '9px 18px', fontSize: 12, borderRadius: 12, cursor: 'pointer', fontFamily: font, fontWeight: 600 }}>
+                {heroPrimaryLabel}
               </button>
-              <button onClick={() => navigate('/editor')} style={{ background: 'transparent', color: '#fff', border: '1px solid rgba(255,255,255,0.5)', padding: '9px 18px', fontSize: 12, borderRadius: 12, cursor: 'pointer', fontFamily: font }}>
-                Design Studio
+              <button onClick={() => navigate(heroSecondaryHref)} style={{ background: 'transparent', color: '#fff', border: '1px solid rgba(255,255,255,0.5)', padding: '9px 18px', fontSize: 12, borderRadius: 12, cursor: 'pointer', fontFamily: font }}>
+                {heroSecondaryLabel}
               </button>
             </div>
           </div>
@@ -374,7 +505,7 @@ export function HomePage() {
             gap: 0,
             height: isTablet ? 280 : 380,
           }}>
-            {HERO_IMAGES.map((src, i) => (
+            {heroImages.map((src, i) => (
               <img key={i} src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                 onError={e => { (e.currentTarget as HTMLImageElement).style.background = '#e2e8f0' }} />
             ))}
@@ -387,21 +518,18 @@ export function HomePage() {
             textAlign: 'center', borderRadius: 12,
           }}>
             <h1 style={{ fontSize: isTablet ? 20 : 26, fontWeight: 700, margin: '0 0 14px', fontFamily: font }}>
-              If you need it, we print it.
+              {heroHeadline}
             </h1>
             <p style={{ fontSize: 14, lineHeight: 1.6, margin: '0 0 16px', opacity: 0.9 }}>
-              From branded business products to beautiful corporate gifts — we've got the product for you. Easy-to-use design tools and same-week delivery across UAE.
+              {heroSubtext}
             </p>
-            <p style={{ fontSize: 14, margin: '0 0 20px' }}>Try our top products starting at just AED 35 each</p>
+            <p style={{ fontSize: 14, margin: '0 0 20px' }}>{heroTagline}</p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <button onClick={() => navigate('/catalog')} style={{ background: '#fff', color: DARK, border: 'none', padding: '10px 20px', fontSize: 13, borderRadius: 12, cursor: 'pointer', fontFamily: font, fontWeight: 600 }}>
-                Shop from AED 35
+              <button onClick={() => navigate(heroPrimaryHref)} style={{ background: '#fff', color: DARK, border: 'none', padding: '10px 20px', fontSize: 13, borderRadius: 12, cursor: 'pointer', fontFamily: font, fontWeight: 600 }}>
+                {heroPrimaryLabel}
               </button>
-              <button onClick={() => navigate('/catalog')} style={{ background: 'transparent', color: '#fff', border: '1px solid #fff', padding: '10px 20px', fontSize: 13, borderRadius: 12, cursor: 'pointer', fontFamily: font }}>
-                Bestselling Products
-              </button>
-              <button onClick={() => navigate('/editor')} style={{ background: 'transparent', color: '#fff', border: '1px solid #fff', padding: '10px 20px', fontSize: 13, borderRadius: 12, cursor: 'pointer', fontFamily: font }}>
-                Design Studio
+              <button onClick={() => navigate(heroSecondaryHref)} style={{ background: 'transparent', color: '#fff', border: '1px solid #fff', padding: '10px 20px', fontSize: 13, borderRadius: 12, cursor: 'pointer', fontFamily: font }}>
+                {heroSecondaryLabel}
               </button>
             </div>
           </div>
@@ -421,11 +549,12 @@ export function HomePage() {
         ))}
       </div>
 
-      {/* ── Explore all categories ────────────────────────────────────────────── */}
+      {/* ── Explore all categories (real DB categories; hidden when empty) ────── */}
+      {categoryTiles.length > 0 && (
       <section style={{ padding: sectionPad }}>
         <h2 style={{ fontSize: isMobile ? 16 : 20, fontWeight: 700, margin: '0 0 16px', fontFamily: font }}>Explore all categories</h2>
         <HSlider itemWidth={catW} isMobile={isMobile}>
-          {CATEGORIES.map(c => (
+          {categoryTiles.map(c => (
             <Link key={c.name} to={c.slug} style={{ textDecoration: 'none', color: DARK, flexShrink: 0, width: catW }}>
               <img src={c.img} alt={c.name} style={{ width: catW, height: catH, objectFit: 'cover', borderRadius: 12, display: 'block', background: '#f2efe8' }}
                 onError={e => { (e.currentTarget as HTMLImageElement).style.background = '#e2e8f0' }} />
@@ -434,12 +563,70 @@ export function HomePage() {
           ))}
         </HSlider>
       </section>
+      )}
 
-      {/* ── Popular products ──────────────────────────────────────────────────── */}
+      {/* ── Web & IT services banner (admin-editable) ────────────────────────── */}
+      {webBannerOn && (
+      <section style={{ margin: `32px ${px}px` }}>
+        <div style={{
+          borderRadius: 16, overflow: 'hidden', position: 'relative',
+          background: 'linear-gradient(120deg, #0B1120 0%, #10224A 55%, #1D4ED8 130%)',
+          display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.1fr 0.9fr',
+        }}>
+          {/* Left: pitch */}
+          <div style={{ padding: isMobile ? '30px 24px' : '48px 52px', display: 'flex', flexDirection: 'column', gap: 16, justifyContent: 'center', position: 'relative', zIndex: 2 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#7DD3FC', fontFamily: font }}>{webBanner.eyebrow}</span>
+            <h2 style={{ fontSize: isMobile ? 22 : 30, fontWeight: 800, margin: 0, color: '#fff', lineHeight: 1.15, fontFamily: font, letterSpacing: '-0.02em' }}>{webBanner.headline}</h2>
+            <p style={{ fontSize: 15, color: '#CBD5E1', margin: 0, lineHeight: 1.65, maxWidth: 460 }}>
+              {webBanner.text}
+            </p>
+            {webBanner.features.length > 0 && (
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 4 }}>
+                {webBanner.features.map(t => (
+                  <span key={t} style={{ fontSize: 12, fontWeight: 600, color: '#E2E8F0', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 999, padding: '5px 12px' }}>✓ {t}</span>
+                ))}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
+              {webBanner.ctaLabel && (webBanner.ctaHref
+                ? <button onClick={() => navigate(webBanner.ctaHref)} style={{ background: '#38BDF8', color: '#04263A', border: 'none', padding: '12px 24px', fontSize: 14, borderRadius: 12, cursor: 'pointer', fontFamily: font, fontWeight: 700 }}>{webBanner.ctaLabel}</button>
+                : <a href={`tel:${contactPhone.replace(/\s/g, '')}`} style={{ background: '#38BDF8', color: '#04263A', border: 'none', padding: '12px 24px', fontSize: 14, borderRadius: 12, cursor: 'pointer', fontFamily: font, fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8 }}>{webBanner.ctaLabel}</a>)}
+              {webBanner.secondaryLabel && (
+                <button onClick={() => navigate(webBanner.secondaryHref || '/catalog')} style={{ background: 'transparent', color: '#fff', border: '1px solid rgba(255,255,255,0.35)', padding: '12px 22px', fontSize: 14, borderRadius: 12, cursor: 'pointer', fontFamily: font, fontWeight: 600 }}>{webBanner.secondaryLabel}</button>
+              )}
+            </div>
+          </div>
+
+          {/* Right: browser/code motif */}
+          <div style={{ position: 'relative', minHeight: isMobile ? 170 : 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '0 24px 28px' : '40px 44px' }}>
+            <div style={{ width: '100%', maxWidth: 360, background: '#0F172A', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, overflow: 'hidden', boxShadow: '0 20px 50px rgba(0,0,0,0.4)' }}>
+              <div style={{ display: 'flex', gap: 6, padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.08)', alignItems: 'center' }}>
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#F87171' }} />
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#FBBF24' }} />
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#34D399' }} />
+                <span style={{ marginLeft: 10, fontSize: 11, color: '#64748B', fontFamily: 'monospace' }}>yourbusiness.ae</span>
+              </div>
+              <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ height: 34, borderRadius: 8, background: 'linear-gradient(90deg,#1D4ED8,#38BDF8)' }} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                  {[0, 1, 2].map(i => <div key={i} style={{ height: 46, borderRadius: 8, background: 'rgba(255,255,255,0.07)' }} />)}
+                </div>
+                <div style={{ height: 8, width: '80%', borderRadius: 4, background: 'rgba(255,255,255,0.12)' }} />
+                <div style={{ height: 8, width: '55%', borderRadius: 4, background: 'rgba(255,255,255,0.1)' }} />
+                <div style={{ height: 30, width: 110, borderRadius: 8, background: '#38BDF8', marginTop: 4 }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      )}
+
+      {/* ── Popular products (real catalog only; hidden when empty) ───────────── */}
+      {popular.length > 0 && (
       <section style={{ padding: sectionPad }}>
-        <h2 style={{ fontSize: isMobile ? 16 : 20, fontWeight: 700, margin: '0 0 16px', fontFamily: font }}>Our most popular products</h2>
+        <h2 style={{ fontSize: isMobile ? 16 : 20, fontWeight: 700, margin: '0 0 16px', fontFamily: font }}>{featuredTitle}</h2>
         <HSlider itemWidth={itemW} isMobile={isMobile}>
-          {POPULAR_ITEMS.map(r => (
+          {popular.map(r => (
             <Link key={r.name} to={r.slug} style={{ textDecoration: 'none', color: DARK, flexShrink: 0, width: itemW }}>
               <img src={r.img} alt={r.name} style={{ width: itemW, height: itemH, objectFit: 'cover', borderRadius: 12, display: 'block', background: '#fafafa' }}
                 onError={e => { (e.currentTarget as HTMLImageElement).style.background = '#e2e8f0' }} />
@@ -450,15 +637,17 @@ export function HomePage() {
           ))}
         </HSlider>
       </section>
+      )}
 
       {/* ── Shop by collection ────────────────────────────────────────────────── */}
+      {collectionsOn && (
       <section style={{ padding: sectionPad }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-          <h2 style={{ fontSize: isMobile ? 16 : 20, fontWeight: 700, margin: 0, fontFamily: font }}>Shop by collection</h2>
+          <h2 style={{ fontSize: isMobile ? 16 : 20, fontWeight: 700, margin: 0, fontFamily: font }}>{sf?.collections.title ?? 'Shop by collection'}</h2>
           <Link to="/catalog" style={{ fontSize: 13, color: BLUE, whiteSpace: 'nowrap' }}>See all collections →</Link>
         </div>
         <HSlider itemWidth={itemW} isMobile={isMobile}>
-          {COLLECTIONS.map(col => (
+          {collectionItems.map(col => (
             <Link key={col.name} to={col.slug} style={{ textDecoration: 'none', color: DARK, flexShrink: 0, width: itemW }}>
               <img src={col.img} alt={col.name} style={{ width: itemW, height: collH, objectFit: 'cover', borderRadius: 12, display: 'block' }}
                 onError={e => { (e.currentTarget as HTMLImageElement).style.background = '#e2e8f0' }} />
@@ -467,12 +656,14 @@ export function HomePage() {
           ))}
         </HSlider>
       </section>
+      )}
 
       {/* ── Must-haves ────────────────────────────────────────────────────────── */}
+      {mustHavesOn && (
       <section style={{ padding: sectionPad }}>
-        <h2 style={{ fontSize: isMobile ? 16 : 20, fontWeight: 700, margin: '0 0 16px', fontFamily: font }}>Explore even more must-haves</h2>
+        <h2 style={{ fontSize: isMobile ? 16 : 20, fontWeight: 700, margin: '0 0 16px', fontFamily: font }}>{sf?.mustHaves.title ?? 'Explore even more must-haves'}</h2>
         <HSlider itemWidth={itemW} isMobile={isMobile}>
-          {MUST_HAVES.map(m => (
+          {mustHaveItems.map(m => (
             <Link key={m.name} to={m.slug} style={{ textDecoration: 'none', color: DARK, flexShrink: 0, width: itemW }}>
               <img src={m.img} alt={m.name} style={{ width: itemW, height: collH, objectFit: 'cover', borderRadius: 12, display: 'block', background: '#f2efe8' }}
                 onError={e => { (e.currentTarget as HTMLImageElement).style.background = '#e2e8f0' }} />
@@ -481,6 +672,7 @@ export function HomePage() {
           ))}
         </HSlider>
       </section>
+      )}
 
       {/* ── Promo split card ──────────────────────────────────────────────────── */}
       <section style={{ margin: `32px ${px}px` }}>
@@ -503,6 +695,7 @@ export function HomePage() {
       </section>
 
       {/* ── Tools ────────────────────────────────────────────────────────────── */}
+      {toolsOn && (
       <section style={{ padding: sectionPad }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
           <h2 style={{ fontSize: isMobile ? 16 : 20, fontWeight: 700, margin: 0, fontFamily: font }}>Tools to help build your business</h2>
@@ -519,8 +712,10 @@ export function HomePage() {
           ))}
         </HSlider>
       </section>
+      )}
 
       {/* ── UGC Gallery ──────────────────────────────────────────────────────── */}
+      {galleryOn && (
       <section style={{ padding: sectionPad }}>
         <h2 style={{ fontSize: isMobile ? 16 : 20, fontWeight: 700, margin: '0 0 4px', fontFamily: font }}>Made by you, #MadeWithMyPrintingWorld</h2>
         <p style={{ fontSize: 13, color: '#666', margin: '0 0 16px' }}>
@@ -536,6 +731,7 @@ export function HomePage() {
           ))}
         </HSlider>
       </section>
+      )}
 
       {/* ── About section ────────────────────────────────────────────────────── */}
       <section style={{ background: '#F8FAFC', marginTop: 24 }}>
@@ -615,7 +811,7 @@ export function HomePage() {
       <div style={{ background: '#0d1826' }}>
         <div style={{ color: '#9db4d4', padding: `12px ${px}px`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, flexWrap: 'wrap', gap: 8 }}>
           <div style={{ display: 'flex', gap: isMobile ? 10 : 16, flexWrap: 'wrap' }}>
-            {!isMobile && <span>+971 4 000 0000</span>}
+            {!isMobile && <span>{contactPhone}</span>}
             <Link to="/" style={{ color: '#9db4d4', textDecoration: 'none' }}>Home</Link>
             <a href="#" style={{ color: '#9db4d4', textDecoration: 'none' }}>Privacy Policy</a>
             {!isMobile && <a href="#" style={{ color: '#9db4d4', textDecoration: 'none' }}>Terms and Conditions</a>}

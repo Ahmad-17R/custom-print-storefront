@@ -30,6 +30,7 @@ interface Product {
   slug: string; name: string; category: string; description: string
   longDescription: string[]; highlights: string[]; careInstructions?: string[]
   basePrice: number; images: string[]; badge?: string; fields: MockField[]
+  editorTemplate?: string | null
 }
 
 const img = (id: string, w = 700, h = 500) =>
@@ -435,6 +436,8 @@ export function ProductDetailPage() {
     basePrice:   apiProduct ? Number(apiProduct.basePrice) : mock.basePrice,
     images:      apiImages.length ? apiImages : mock.images,
     fields:      mock.fields,
+    // DB decides designability; fall back to the built-in slug map when offline.
+    editorTemplate: apiProduct ? apiProduct.editorTemplate ?? null : EDITOR_TEMPLATE[slug ?? ''] ?? null,
   }
   const configFields = useMemo<ConfigField[]>(() => {
     if (apiProduct === undefined) return []
@@ -458,7 +461,7 @@ export function ProductDetailPage() {
   const hasConfiguredQuantity = hasQuantityField(configFields)
   const price = Math.round(configured * (hasConfiguredQuantity ? 1 : Math.max(1, qty / 100)))
 
-  const editorKey  = EDITOR_TEMPLATE[product.slug]
+  const editorKey  = product.editorTemplate || undefined
   const designable = !!editorKey
   const fileRef    = useRef<HTMLInputElement>(null)
 

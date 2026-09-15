@@ -11,7 +11,7 @@ const pageKey = (href: string) => href.replace('/admin/', '')
 // automatically gets the POS Terminal even without the explicit page right.
 function canSeePage(user: AuthEmployee | null, can: (k: string) => boolean, key: string): boolean {
   if (!user) return false
-  if (key === 'my-jobs') return !user.isOwner                         // personal worker screen — not for the owner
+  if (key === 'my-jobs' || key === 'my-requests') return !user.isOwner  // personal staff screens — not for the owner
   if (can(key)) return true
   if (key === 'pos/terminal' && !!user.posRegisterId) return true
   return false
@@ -66,6 +66,7 @@ const NAV_GROUPS = [
       { label: 'Products',    href: '/admin/products' },
       { label: 'Categories',  href: '/admin/categories' },
       { label: 'Brands',      href: '/admin/brands' },
+      { label: 'Storefront',  href: '/admin/storefront' },
     ],
   },
   {
@@ -73,11 +74,9 @@ const NAV_GROUPS = [
     items: [
       { label: 'All Orders',      href: '/admin/orders' },
       { label: 'Order Handling',  href: '/admin/online-order-handling' },
-      { label: 'Quotations',      href: '/admin/quotations' },
-      { label: 'Sales Orders',    href: '/admin/sales-orders' },
+      { label: 'Order Summary',   href: '/admin/online-order-summary' },
+      { label: 'Shipments',       href: '/admin/shipments' },
       { label: 'Sales Invoices',  href: '/admin/sales-invoices' },
-      { label: 'Delivery Notes',  href: '/admin/delivery-notes' },
-      { label: 'Sales Returns',   href: '/admin/sales-returns' },
       { label: 'Credit Notes',    href: '/admin/credit-notes' },
     ],
   },
@@ -257,6 +256,12 @@ function Sidebar({ collapsed, setCollapsed, onClose }: { collapsed: boolean; set
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: collapsed ? '8px 0' : '8px 10px', justifyContent: collapsed ? 'center' : 'flex-start', borderRadius: 8, background: pathname === '/admin/my-jobs' ? DARK2 : 'transparent', color: pathname === '/admin/my-jobs' ? '#fff' : '#94A3B8' }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
             {!collapsed && <span style={{ fontSize: 13, fontFamily: font }}>My Jobs</span>}
+          </div>
+        </Link>
+        <Link to="/admin/my-requests" style={{ textDecoration: 'none' }} onClick={onClose}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: collapsed ? '8px 0' : '8px 10px', marginTop: 4, justifyContent: collapsed ? 'center' : 'flex-start', borderRadius: 8, background: pathname === '/admin/my-requests' ? DARK2 : 'transparent', color: pathname === '/admin/my-requests' ? '#fff' : '#94A3B8' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M9 15h6M9 11h2"/></svg>
+            {!collapsed && <span style={{ fontSize: 13, fontFamily: font }}>My Requests</span>}
           </div>
         </Link>
       </div>
@@ -440,7 +445,8 @@ export function AdminLayout({ title, actions, children }: {
       ? can('dashboard')                                  // base = dashboard, must be granted
       : canSeePage(user, can, key) ||                     // exact page (or terminal via counter)
         canSeePage(user, can, key.split('/')[0]) ||       // sub-route: first segment (products/:id/…)
-        canSeePage(user, can, key.split('/').slice(0, 2).join('/'))  // two-segment (pos/terminal)
+        canSeePage(user, can, key.split('/').slice(0, 2).join('/')) ||  // two-segment (pos/terminal)
+        (key.split('/')[0] === 'invoice' && (can('sales-invoices') || can('credit-notes') || can('orders')))  // printable invoice view
   )
 
   return (
@@ -581,7 +587,7 @@ export function Badge({ label, color }: { label: string; color: string }) {
   )
 }
 
-export function Btn({ label, onClick, variant = 'primary', icon }: { label: string; onClick?: () => void; variant?: 'primary' | 'secondary' | 'danger'; icon?: React.ReactNode }) {
+export function Btn({ label, onClick, variant = 'primary', icon }: { label: string; onClick?: (e: React.MouseEvent) => void; variant?: 'primary' | 'secondary' | 'danger'; icon?: React.ReactNode }) {
   const styles: Record<string, React.CSSProperties> = {
     primary:   { background: BLUE,      color: '#fff',    border: 'none' },
     secondary: { background: '#fff',    color: DARK,      border: '1px solid #E2E8F0' },

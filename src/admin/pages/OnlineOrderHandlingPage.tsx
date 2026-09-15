@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { AdminLayout, StatCard, StatGrid, Badge } from '../components/AdminLayout'
-import { AdminOrderInformation, type AdminOrderDetail } from '../components/AdminOrderDetails'
+import { AdminOrderInformation, AdminOrderDetails, type AdminOrderDetail } from '../components/AdminOrderDetails'
 import { api } from '../../lib/api'
 
 const FONT = "'Poppins', system-ui, sans-serif"
@@ -9,9 +9,9 @@ const DARK = '#0F172A'
 const BLUE = '#3B82F6'
 const fmt = (n: number) => Number(n).toLocaleString(undefined, { minimumFractionDigits: 2 })
 
-const HANDLING = ['confirmed', 'in_production', 'ready'] as const
-const S_LABEL: Record<string, string> = { confirmed: 'Confirmed', in_production: 'In Production', ready: 'Ready', delivered: 'Delivered', cancelled: 'Cancelled', pending: 'Pending' }
-const S_COLOR: Record<string, string> = { confirmed: '#8B5CF6', in_production: '#3B82F6', ready: '#10B981', delivered: '#059669', cancelled: '#EF4444', pending: '#64748B' }
+const HANDLING = ['confirmed', 'in_production', 'ready', 'out_for_delivery'] as const
+const S_LABEL: Record<string, string> = { confirmed: 'Confirmed', in_production: 'In Production', ready: 'Ready', out_for_delivery: 'Out for Delivery', delivered: 'Delivered', cancelled: 'Cancelled', pending: 'Pending' }
+const S_COLOR: Record<string, string> = { confirmed: '#8B5CF6', in_production: '#3B82F6', ready: '#10B981', out_for_delivery: '#F59E0B', delivered: '#059669', cancelled: '#EF4444', pending: '#64748B' }
 const JOB_COLOR: Record<string, string> = { pending: '#94A3B8', in_progress: '#3B82F6', done: '#10B981', cancelled: '#EF4444' }
 const STEP_STATUSES = ['pending', 'in_progress', 'done', 'cancelled']
 const SUP_STATUSES = ['sent', 'in_progress', 'received']
@@ -274,6 +274,7 @@ export function OnlineOrderHandlingPage() {
   const [materials, setMat] = useState<{ id: string; name: string; unit: string }[]>([])
   const [params, setParams] = useSearchParams()
   const drawerId = params.get('order')
+  const viewId = params.get('view')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -289,8 +290,10 @@ export function OnlineOrderHandlingPage() {
     api.get<{ data: { id: string; name: string; unit: string }[] }>('/materials?pageSize=500').then(r => setMat(r.data))
   }, [])
 
-  const openDrawer = (id: string) => setParams(p => { const n = new URLSearchParams(p); n.set('order', id); return n })
+  const openDrawer = (id: string) => setParams(p => { const n = new URLSearchParams(p); n.set('order', id); n.delete('view'); return n })
   const closeDrawer = () => setParams(p => { const n = new URLSearchParams(p); n.delete('order'); return n })
+  const openView = (id: string) => setParams(p => { const n = new URLSearchParams(p); n.set('view', id); n.delete('order'); return n })
+  const closeView = () => setParams(p => { const n = new URLSearchParams(p); n.delete('view'); return n })
 
   const filtered = orders.filter(o => statusF === 'all' || o.status === statusF)
 
@@ -320,7 +323,7 @@ export function OnlineOrderHandlingPage() {
               const pct = total ? Math.round(doneJ / total * 100) : 0
               const unassigned = o.jobs.filter(j => j.type === 'in_house' && !j.assignedTo && j.status !== 'done').length
               return (
-                <div key={o.id} onClick={() => openDrawer(o.id)} style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 12, padding: '14px 18px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 18 }}>
+                <div key={o.id} style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 18 }}>
                   <div style={{ minWidth: 180 }}>
                     <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: DARK }}>{o.orderNumber}</div>
                     <div style={{ fontFamily: FONT, fontSize: 12, color: '#64748B' }}>{o.customer?.fullName ?? o.customer?.email ?? 'Online'}</div>
@@ -336,7 +339,10 @@ export function OnlineOrderHandlingPage() {
                   </div>
                   {unassigned > 0 && <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 999, background: '#FEF2F2', color: '#DC2626' }}>{unassigned} unassigned</span>}
                   <div style={{ minWidth: 100, textAlign: 'right', fontFamily: FONT, fontSize: 13, fontWeight: 700, color: DARK }}>AED {fmt(Number(o.total))}</div>
-                  <button style={{ background: DARK, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 700, fontFamily: FONT, cursor: 'pointer' }}>Handle →</button>
+                  <button onClick={() => openView(o.id)} style={{ background: '#fff', color: DARK, border: '1px solid #CBD5E1', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 600, fontFamily: FONT, cursor: 'pointer' }}>View</button>
+                  {total > 0
+                    ? <button onClick={() => openDrawer(o.id)} style={{ background: DARK, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 700, fontFamily: FONT, cursor: 'pointer' }}>Order Handling →</button>
+                    : <span title="No production jobs — set the status from View" style={{ fontSize: 11, color: '#94A3B8', fontFamily: FONT, minWidth: 110, textAlign: 'center' }}>No jobs · set status in View</span>}
                 </div>
               )
             })}
@@ -344,6 +350,13 @@ export function OnlineOrderHandlingPage() {
         )}
 
       {drawerId && <OrderDrawer orderId={drawerId} warehouses={warehouses} suppliers={suppliers} materials={materials} onClose={closeDrawer} onUpdated={load} />}
+      {viewId && <>
+        <div onClick={closeView} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', zIndex: 999 }} />
+        <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 680, maxWidth: '100%', background: '#fff', overflowY: 'auto', zIndex: 1000, boxShadow: '-8px 0 30px rgba(0,0,0,.15)' }}>
+          <button onClick={closeView} style={{ position: 'absolute', top: 14, right: 14, zIndex: 1, border: 0, background: 'none', fontSize: 22, cursor: 'pointer' }}>×</button>
+          <AdminOrderDetails orderId={viewId} onUpdated={load} />
+        </div>
+      </>}
     </AdminLayout>
   )
 }

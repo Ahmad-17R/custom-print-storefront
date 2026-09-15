@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { fetchCatalog, catalogImageUrl } from '../../lib/api'
 
 // Preferred tab order for the known catalog categories; any other category the
@@ -213,36 +213,35 @@ function ProductCard({ product }: { product: CatalogCard }) {
 }
 
 export function CatalogPage() {
-  const [activeCategory, setActiveCategory] = useState('All')
-  const [search, setSearch] = useState('')
-  // Live catalog from the backend; seeded to the mock list so the page renders
-  // instantly and still works offline if the API is unreachable.
-  const [products, setProducts] = useState<CatalogCard[]>(CATALOG_PRODUCTS)
+  const [searchParams] = useSearchParams()
+  const [activeCategory, setActiveCategory] = useState(searchParams.get('category') ?? 'All')
+  const [search, setSearch] = useState(searchParams.get('q') ?? '')
+  // Live catalog from the backend — shows ONLY real products managed in the admin.
+  const [products, setProducts] = useState<CatalogCard[]>([])
+  const [loading, setLoading]   = useState(true)
 
   useEffect(() => {
     let cancelled = false
     fetchCatalog()
       .then(rows => {
-        if (cancelled || rows.length === 0) return   // empty API → keep mock
-        const mockBySlug = Object.fromEntries(CATALOG_PRODUCTS.map(p => [p.slug, p]))
+        if (cancelled) return
         setProducts(rows.map(r => {
-          const mock = mockBySlug[r.slug]
           const main = r.images.find(i => i.isMain) ?? r.images[0]
-          const image = catalogImageUrl(main?.url) || mock?.image || img('photo-1607082348824-0a96f2a4b9da')
+          const image = catalogImageUrl(main?.url) || img('photo-1607082348824-0a96f2a4b9da')
           return {
             id: r.id,
             slug: r.slug,
             name: r.name,
-            category: r.category?.name ?? mock?.category ?? 'Print',
-            basePrice: Number(r.basePrice) || mock?.basePrice || 0,
-            badge: mock?.badge,                       // badges are marketing-only, not in the DB
-            description: r.description ?? mock?.description ?? '',
+            category: r.category?.name ?? 'Print',
+            basePrice: Number(r.basePrice) || 0,
+            description: r.description ?? '',
             image,
-            fallback: mock?.fallback || image,
+            fallback: image,
           }
         }))
       })
-      .catch(() => { /* API down → keep the mock list already in state */ })
+      .catch(() => { if (!cancelled) setProducts([]) })
+      .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [])
 
@@ -255,10 +254,19 @@ export function CatalogPage() {
     return ['All', ...known, ...extra]
   }, [products])
 
-  // If the active tab's category disappears (e.g. catalog reload), fall back to All.
+  // Follow the ?category= and ?q= query params (home nav strip + search bar).
   useEffect(() => {
-    if (activeCategory !== 'All' && !categories.includes(activeCategory)) setActiveCategory('All')
-  }, [categories, activeCategory])
+    const cat = searchParams.get('category')
+    if (cat) setActiveCategory(cat)
+    const query = searchParams.get('q')
+    if (query !== null) setSearch(query)
+  }, [searchParams])
+
+  // If the active tab's category disappears (e.g. catalog reload), fall back to All.
+  // Guard on !loading so we don't clobber a ?category= selection before products arrive.
+  useEffect(() => {
+    if (!loading && activeCategory !== 'All' && !categories.includes(activeCategory)) setActiveCategory('All')
+  }, [categories, activeCategory, loading])
 
   const filtered = products.filter(p => {
     const matchCat = activeCategory === 'All' || p.category === activeCategory
@@ -266,6 +274,24 @@ export function CatalogPage() {
                         p.description.toLowerCase().includes(search.toLowerCase())
     return matchCat && matchSearch
   })
+
+  // Infinite scroll: render in pages so the grid scales to large catalogs.
+  const PAGE = 24
+  const [visibleCount, setVisibleCount] = useState(PAGE)
+  useEffect(() => { setVisibleCount(PAGE) }, [activeCategory, search])
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
+  const hasMore = visibleCount < filtered.length
+  useEffect(() => {
+    if (!hasMore) return
+    const el = sentinelRef.current
+    if (!el) return
+    const io = new IntersectionObserver(entries => {
+      if (entries[0]?.isIntersecting) setVisibleCount(c => c + PAGE)
+    }, { rootMargin: '400px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [hasMore, filtered.length])
+  const visible = filtered.slice(0, visibleCount)
 
   const font = "'Poppins', system-ui, sans-serif"
 
@@ -324,15 +350,27 @@ export function CatalogPage() {
           {search ? ` matching "${search}"` : ''}
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 20 }}>
-          {filtered.map(p => <ProductCard key={p.id} product={p} />)}
+          {visible.map(p => <ProductCard key={p.id} product={p} />)}
         </div>
-        {filtered.length === 0 && (
+        {hasMore && (
+          <div ref={sentinelRef} style={{ display: 'flex', justifyContent: 'center', padding: '28px 0' }}>
+            <button onClick={() => setVisibleCount(c => c + PAGE)}
+              style={{ padding: '10px 22px', borderRadius: 10, border: '1px solid #E2E8F0', background: '#fff', color: '#334155', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'system-ui' }}>
+              Load more ({filtered.length - visibleCount} more)
+            </button>
+          </div>
+        )}
+        {loading && products.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '60px 0', color: '#94A3B8', fontFamily: 'system-ui' }}>Loading products…</div>
+        )}
+        {!loading && filtered.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px 0', color: '#64748B', fontFamily: 'system-ui' }}>
             <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style={{ marginBottom: 12, opacity: 0.4 }}>
               <circle cx="22" cy="22" r="14" stroke="#64748B" strokeWidth="2.5"/>
               <path d="M33 33L43 43" stroke="#64748B" strokeWidth="2.5" strokeLinecap="round"/>
             </svg>
-            <p style={{ fontWeight: 600 }}>No products match "{search}"</p>
+            <p style={{ fontWeight: 600 }}>{search ? `No products match "${search}"` : 'No products available yet'}</p>
+            {!search && <p style={{ fontSize: 13, marginTop: 4 }}>Products added in the admin panel will appear here.</p>}
           </div>
         )}
       </div>

@@ -5,8 +5,8 @@ import { api } from '../../lib/api'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
-const labels: Record<string, string> = { pending: 'Pending', confirmed: 'Confirmed', in_production: 'In Production', ready: 'Ready', delivered: 'Delivered', cancelled: 'Cancelled', refunded: 'Refunded' }
-const colors: Record<string, string> = { pending: '#F59E0B', confirmed: '#1D4ED8', in_production: '#8B5CF6', ready: '#10B981', delivered: '#047857', cancelled: '#EF4444', refunded: '#DC2626' }
+const labels: Record<string, string> = { pending: 'Pending', confirmed: 'Confirmed', in_production: 'In Production', ready: 'Ready', out_for_delivery: 'Out for Delivery', delivered: 'Delivered', cancelled: 'Cancelled', refunded: 'Refunded' }
+const colors: Record<string, string> = { pending: '#F59E0B', confirmed: '#1D4ED8', in_production: '#8B5CF6', ready: '#10B981', out_for_delivery: '#F59E0B', delivered: '#047857', cancelled: '#EF4444', refunded: '#DC2626' }
 const statuses = Object.keys(labels)
 const columns = [
   { key: 'orderNumber', label: 'Order Number', width: 190 }, { key: 'customerName', label: 'Customer' },

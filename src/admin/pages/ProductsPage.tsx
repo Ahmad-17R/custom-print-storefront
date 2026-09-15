@@ -2,12 +2,19 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AdminLayout, Table, Btn, SearchInput, Badge, StatCard, StatGrid } from '../components/AdminLayout'
 import { api } from '../../lib/api'
+import { TEMPLATES } from '../../shared/components/product-editor/templates'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
 const API_BASE = 'http://localhost:4000'
 
-interface Product { id: string; name: string; slug: string; brandId: string; categoryId: string; basePrice: number; isActive: boolean; variantCount: number; createdAt: string }
+interface Product { id: string; name: string; slug: string; brandId: string; categoryId: string; basePrice: number; editorTemplate?: string | null; isActive: boolean; variantCount: number; createdAt: string }
+// Derived from the real editor templates so every available design (all business-card
+// shapes, letterhead, pen) is offered and the list never drifts from the editor.
+const EDITOR_TEMPLATES = [
+  { value: '', label: 'Upload only (no design editor)' },
+  ...Object.entries(TEMPLATES).map(([value, t]) => ({ value, label: (t as { label?: string }).label ?? value })),
+]
 interface Brand    { id: string; name: string }
 interface Category { id: string; name: string }
 interface ProductImage { id: string; url: string; altText: string | null; sortOrder: number; isMain: boolean }
@@ -27,7 +34,7 @@ function Modal({ product, brands, categories, onClose, onSave }: {
   brands: Brand[]; categories: Category[]
   onClose: () => void; onSave: () => void
 }) {
-  const [form, setForm] = useState({ name: product?.name ?? '', brandId: product?.brandId ?? brands[0]?.id ?? '', categoryId: product?.categoryId ?? categories[0]?.id ?? '', description: '', basePrice: product?.basePrice != null ? String(product.basePrice) : '' })
+  const [form, setForm] = useState({ name: product?.name ?? '', brandId: product?.brandId ?? brands[0]?.id ?? '', categoryId: product?.categoryId ?? categories[0]?.id ?? '', description: '', basePrice: product?.basePrice != null ? String(product.basePrice) : '', editorTemplate: product?.editorTemplate ?? '' })
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   if (product === null) return null
@@ -41,10 +48,11 @@ function Modal({ product, brands, categories, onClose, onSave }: {
     try {
       const basePrice = form.basePrice.trim() === '' ? undefined : Number(form.basePrice)
       if (product.id) {
-        await api.patch(`/products/${product.id}`, { name: form.name, ...(basePrice !== undefined ? { basePrice } : {}) })
+        await api.patch(`/products/${product.id}`, { name: form.name, editorTemplate: form.editorTemplate || null, ...(basePrice !== undefined ? { basePrice } : {}) })
       } else {
         await api.post('/products', {
           name: form.name, brandId: form.brandId, categoryId: form.categoryId,
+          editorTemplate: form.editorTemplate || null,
           ...(form.description.trim() ? { description: form.description.trim() } : {}),
           ...(basePrice !== undefined ? { basePrice } : {}),
         })
@@ -65,6 +73,13 @@ function Modal({ product, brands, categories, onClose, onSave }: {
         <label style={{ display: 'block', marginBottom: 14 }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 4 }}>Base Price (AED)</span>
           <input type="number" min="0" step="0.01" value={form.basePrice} onChange={e => f('basePrice', e.target.value)} placeholder="0.00" style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 13, fontFamily: FONT, boxSizing: 'border-box', outline: 'none' }} />
+        </label>
+        <label style={{ display: 'block', marginBottom: 14 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 4 }}>Design mode</span>
+          <select value={form.editorTemplate} onChange={e => f('editorTemplate', e.target.value)} style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 13, fontFamily: FONT, boxSizing: 'border-box', outline: 'none' }}>
+            {EDITOR_TEMPLATES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </select>
+          <span style={{ fontSize: 11, color: '#94A3B8', display: 'block', marginTop: 4 }}>Designable products show a “Design it” button using the chosen editor template. “Upload only” lets customers upload artwork instead.</span>
         </label>
         {!product.id && (
           <label style={{ display: 'block', marginBottom: 14 }}>

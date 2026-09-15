@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import { AdminLayout, Table, Btn, SearchInput, Badge, StatCard, StatGrid } from '../components/AdminLayout'
-import { api } from '../../lib/api'
+import { api, uploadCategoryImage, catalogImageUrl } from '../../lib/api'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
 
-interface Category { id: string; name: string; parentId: string | null; isActive: boolean; createdAt: string }
+interface Category { id: string; name: string; imageUrl: string | null; parentId: string | null; isActive: boolean; createdAt: string }
 
 const COLS = [
   { key: 'name',      label: 'Category Name' },
@@ -17,16 +17,30 @@ const COLS = [
 
 function Modal({ cat, all, onClose, onSave }: { cat: Partial<Category> | null; all: Category[]; onClose: () => void; onSave: () => void }) {
   const [name, setName]     = useState(cat?.name ?? '')
+  const [imageUrl, setImageUrl] = useState(cat?.imageUrl ?? '')
+  const [uploading, setUploading] = useState(false)
   const [parentId, setParentId] = useState(cat?.parentId ?? '')
   const [loading, setLoading]   = useState(false)
   const [err, setErr]           = useState('')
   if (cat === null) return null
 
+  const onPickImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setErr(''); setUploading(true)
+    try {
+      const { url } = await uploadCategoryImage(file)
+      setImageUrl(url)
+    } catch (e: unknown) { setErr(e instanceof Error ? e.message : 'Upload failed') }
+    finally { setUploading(false) }
+  }
+
   const save = async () => {
+    if (uploading) return setErr('Please wait for the image to finish uploading')
     if (!name.trim()) return setErr('Name is required')
     setLoading(true)
     try {
-      const body = { name, parentId: parentId || null }
+      const body = { name, imageUrl: imageUrl.trim() || null, parentId: parentId || null }
       if (cat.id) await api.patch(`/categories/${cat.id}`, body)
       else        await api.post('/categories', body)
       onSave(); onClose()
@@ -42,6 +56,23 @@ function Modal({ cat, all, onClose, onSave }: { cat: Partial<Category> | null; a
           <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 4 }}>Category Name *</span>
           <input value={name} onChange={e => setName(e.target.value)} style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 13, fontFamily: FONT, boxSizing: 'border-box', outline: 'none' }} />
         </label>
+        <div style={{ marginBottom: 14 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 6 }}>Category Image</span>
+          {imageUrl.trim() && (
+            <img src={catalogImageUrl(imageUrl)} alt="" style={{ marginBottom: 8, width: '100%', height: 140, objectFit: 'cover', borderRadius: 8, background: '#F1F5F9', display: 'block' }}
+              onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <label style={{ display: 'inline-block', padding: '8px 14px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 13, fontWeight: 600, color: DARK, cursor: uploading ? 'default' : 'pointer', background: '#F8FAFC' }}>
+              {uploading ? 'Uploading…' : imageUrl.trim() ? 'Change image' : 'Upload image'}
+              <input type="file" accept="image/*" onChange={onPickImage} disabled={uploading} style={{ display: 'none' }} />
+            </label>
+            {imageUrl.trim() && !uploading && (
+              <button type="button" onClick={() => setImageUrl('')} style={{ background: 'transparent', border: 'none', color: '#EF4444', fontSize: 12, cursor: 'pointer', fontFamily: FONT }}>Remove</button>
+            )}
+          </div>
+          <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 6 }}>PNG, JPG or any image · max 8 MB · shown on the storefront category tile.</div>
+        </div>
         <label style={{ display: 'block', marginBottom: 20 }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 4 }}>Parent Category</span>
           <select value={parentId} onChange={e => setParentId(e.target.value)} style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 13, fontFamily: FONT, outline: 'none' }}>

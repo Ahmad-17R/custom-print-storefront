@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { useCart } from '../../context/CartContext'
@@ -15,64 +15,60 @@ function productInfo(key: string) {
   return PRODUCT_INFO[key] ?? PRODUCT_INFO.business_card
 }
 
-// Mockup art per side. Apparel products get a t-shirt; everything else a flat sheet.
-const TSHIRT_FRONT = 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=900&q=80'
-const TSHIRT_BACK  = 'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=900&q=80'
-
-const APPAREL = ['tshirt', 't_shirt', 't-shirt', 'clothing', 'apparel', 'shirt', 'hoodie', 'bag', 'tote']
+interface CapturedZone { id: string; label: string; width: number; height: number }
+interface CapturedDesign { productType: string; label: string; zones: CapturedZone[]; shots: Record<string, string> }
 
 export function DesignReviewPage() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const { addItem } = useCart()
   const product = params.get('product') ?? 'business_card'
-  const isApparel = APPAREL.some(k => product.toLowerCase().includes(k))
 
-  const [side, setSide]       = useState<'front' | 'back'>('front')
+  // The editor stashes the rendered sides here before navigating.
+  const design = useMemo<CapturedDesign | null>(() => {
+    try { const d = JSON.parse(sessionStorage.getItem('inkora_design') || 'null'); return d && d.productType === product ? d : null } catch { return null }
+  }, [product])
+
+  const zones = design?.zones ?? [{ id: 'front', label: 'Front', width: 90, height: 54 }, { id: 'back', label: 'Back', width: 90, height: 54 }]
+  const [zoneId, setZoneId] = useState(zones[0]?.id ?? 'front')
+  const zone = zones.find(z => z.id === zoneId) ?? zones[0]
+  const shot = design?.shots?.[zoneId] ?? null
   const [approved, setApprove] = useState(false)
 
   const editHref = `/editor?product=${product}`
   const close = () => navigate(editHref)
-  // Approving the design auto-adds it to the cart, then opens the cart
   const cont  = () => {
     if (!approved) return
     const info = productInfo(product)
-    addItem({ id: `${info.slug}::design::${Date.now()}`, slug: info.slug, name: info.name, image: '', options: ['Custom design (editor)'], qty: 1, unitPrice: info.price })
+    const image = design?.shots?.[zones[0]?.id] ?? ''  // front thumbnail for the cart
+    addItem({ id: `${info.slug}::design::${Date.now()}`, slug: info.slug, name: info.name, image, options: [`Custom design (${design?.label ?? 'editor'})`], qty: 1, unitPrice: info.price })
     navigate('/cart')
   }
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: '#fff', display: 'flex', fontFamily: FONT }}>
-      {/* ── Left: product mockup ── */}
+      {/* ── Left: the customer's actual design ── */}
       <div style={{ flex: 1, background: '#F4F4F5', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, minWidth: 0 }}>
-        <div style={{ position: 'relative', width: 'min(60vh, 520px)', aspectRatio: '3/4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {isApparel ? (
-            <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-              <img src={side === 'front' ? TSHIRT_FRONT : TSHIRT_BACK} alt="Product mockup" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-              {/* Print zone with the customer's design placeholder */}
-              <div style={{ position: 'absolute', top: '42%', left: '50%', transform: 'translate(-50%,-50%)', width: '30%', aspectRatio: '4/3', border: '1px dashed #94A3B8', background: 'rgba(255,255,255,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', color: '#64748B', fontSize: 11, padding: 6 }}>
-                Your design ({side})
-              </div>
-            </div>
-          ) : (
-            <div style={{ width: '82%', aspectRatio: '3/4', background: '#fff', boxShadow: '0 10px 40px rgba(0,0,0,0.12)', borderRadius: 4, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ position: 'absolute', inset: 18, border: '1.5px dashed #e2453f', borderRadius: 4 }} />
-              <span style={{ color: '#64748B', fontSize: 13 }}>Your design ({side})</span>
-            </div>
-          )}
+        <div style={{ maxWidth: 'min(72vw, 560px)', maxHeight: '62vh', width: `min(72vw, 560px, ${zone.height ? (62 * zone.width / zone.height) : 100}vh)` }}>
+          <div style={{ width: '100%', aspectRatio: `${zone.width} / ${zone.height}`, background: '#fff', boxShadow: '0 12px 44px rgba(0,0,0,0.16)', borderRadius: 4, position: 'relative', overflow: 'hidden' }}>
+            {shot
+              ? <img src={shot} alt={`Your design ${zone.label}`} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+              : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontSize: 13 }}>Your design ({zone.label})</div>}
+          </div>
+          <div style={{ textAlign: 'center', marginTop: 10, fontSize: 12, color: '#94A3B8' }}>{zone.width} × {zone.height} mm</div>
         </div>
 
-        {/* Front / Back toggle */}
-        <div style={{ display: 'flex', gap: 12, marginTop: 28 }}>
-          {(['front', 'back'] as const).map(sd => (
-            <button key={sd} onClick={() => setSide(sd)}
-              style={{ padding: '10px 26px', borderRadius: 8, fontFamily: FONT, fontSize: 14, fontWeight: 600, cursor: 'pointer',
-                background: '#fff', color: '#111827',
-                border: `1.5px solid ${side === sd ? '#111827' : '#E2E8F0'}` }}>
-              {sd === 'front' ? 'Front' : 'Back'}
-            </button>
-          ))}
-        </div>
+        {/* Side toggle */}
+        {zones.length > 1 && (
+          <div style={{ display: 'flex', gap: 12, marginTop: 22 }}>
+            {zones.map(z => (
+              <button key={z.id} onClick={() => setZoneId(z.id)}
+                style={{ padding: '10px 26px', borderRadius: 8, fontFamily: FONT, fontSize: 14, fontWeight: 600, cursor: 'pointer', background: '#fff', color: '#111827', border: `1.5px solid ${zoneId === z.id ? '#111827' : '#E2E8F0'}` }}>
+                {z.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Right: review panel ── */}
@@ -83,6 +79,7 @@ export function DesignReviewPage() {
 
         <h1 style={{ fontSize: 34, fontWeight: 800, color: '#111827', margin: '0 0 14px', letterSpacing: '-0.02em' }}>Review your design</h1>
         <p style={{ fontSize: 16, color: '#374151', margin: '0 0 28px' }}>Double-check the following details before you continue.</p>
+        {!design && <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', color: '#92400E', borderRadius: 8, padding: '10px 12px', fontSize: 13, marginBottom: 20 }}>We couldn't load your design preview — go back and open the editor again if the sides look blank.</div>}
 
         <ul style={{ listStyle: 'disc', paddingLeft: 22, margin: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
           <li style={{ fontSize: 16, color: '#111827' }}>Text is clear and easy to read</li>
@@ -90,7 +87,6 @@ export function DesignReviewPage() {
           <li style={{ fontSize: 16, color: '#111827' }}>Images are sharp with no blurring</li>
         </ul>
 
-        {/* Spacer pushes actions to the bottom */}
         <div style={{ flex: 1 }} />
 
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: 16 }}>

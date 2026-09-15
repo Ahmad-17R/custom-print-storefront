@@ -15,6 +15,7 @@ import { SignupPage }          from './customer/pages/SignupPage'
 import { CheckoutPage }        from './customer/pages/CheckoutPage'
 import { OrderConfirmationPage }from './customer/pages/OrderConfirmationPage'
 import { MyOrdersPage }        from './customer/pages/MyOrdersPage'
+import { AccountPage }         from './customer/pages/AccountPage'
 import { OrderDetailPage }     from './customer/pages/OrderDetailPage'
 
 // Admin auth
@@ -29,6 +30,9 @@ import { AdminProductFields }  from './admin/pages/AdminProductFields'
 import { AdminProductJobs }    from './admin/pages/AdminProductJobs'
 import { ProductsPage }        from './admin/pages/ProductsPage'
 import { CategoriesPage }      from './admin/pages/CategoriesPage'
+import { StorefrontSettingsPage } from './admin/pages/StorefrontSettingsPage'
+import { InvoiceDocumentPage } from './admin/pages/InvoiceDocumentPage'
+import { OnlineOrderSummaryPage } from './admin/pages/OnlineOrderSummaryPage'
 import { BrandsPage }          from './admin/pages/BrandsPage'
 import { OrdersPage }          from './admin/pages/OrdersPage'
 import { OnlineOrderHandlingPage } from './admin/pages/OnlineOrderHandlingPage'
@@ -63,6 +67,7 @@ import { WalkInSalesPage }            from './admin/pages/WalkInSalesPage'
 import { OrderHandlingPage }          from './admin/pages/OrderHandlingPage'
 import { OrderSummaryPage }           from './admin/pages/OrderSummaryPage'
 import { MyJobsPage }                 from './admin/pages/MyJobsPage'
+import { MyRequestsPage }             from './admin/pages/MyRequestsPage'
 import { PosRegistersPage }           from './admin/pages/PosRegistersPage'
 import { PosTerminalPage }            from './admin/pages/PosTerminalPage'
 import { StockAdjustmentsPage } from './admin/pages/StockAdjustmentsPage'
@@ -163,6 +168,7 @@ function Layout() {
           <Route path="/orders/:id/confirmation" element={<OrderConfirmationPage />} />
           <Route path="/orders/:id"            element={<OrderDetailPage />} />
           <Route path="/orders"                element={<MyOrdersPage />} />
+          <Route path="/account"               element={<AccountPage />} />
 
           {/* Admin — all routes share the country context */}
           <Route path="/admin/*" element={
@@ -175,9 +181,12 @@ function Layout() {
                 <Route path="products/:id/fields"       element={<AdminProductFields />} />
                 <Route path="products/:id/jobs"         element={<AdminProductJobs />} />
                 <Route path="categories"                element={<CategoriesPage />} />
+                <Route path="storefront"                element={<StorefrontSettingsPage />} />
+                <Route path="invoice/:orderId"          element={<InvoiceDocumentPage />} />
                 <Route path="brands"                    element={<BrandsPage />} />
                 <Route path="orders"                    element={<OrdersPage />} />
                 <Route path="online-order-handling"     element={<OnlineOrderHandlingPage />} />
+                <Route path="online-order-summary"      element={<OnlineOrderSummaryPage />} />
                 <Route path="customers"                 element={<CustomersPage />} />
                 <Route path="suppliers"                 element={<SuppliersPage />} />
                 <Route path="stock"                     element={<StockPage />} />
@@ -208,6 +217,7 @@ function Layout() {
                 <Route path="order-handling"          element={<OrderHandlingPage />} />
                 <Route path="order-summary"           element={<OrderSummaryPage />} />
                 <Route path="my-jobs"                 element={<MyJobsPage />} />
+                <Route path="my-requests"             element={<MyRequestsPage />} />
                 <Route path="stock-adjustments"         element={<StockAdjustmentsPage />} />
                 <Route path="stock-transfers"           element={<StockTransfersPage />} />
                 <Route path="lots"                      element={<LotsPage />} />
@@ -274,6 +284,7 @@ function Layout() {
           <Route path="/catalog"         element={<CatalogPage />} />
           <Route path="/products/:slug"  element={<ProductDetailPage />} />
           <Route path="/cart"            element={<CartPage />} />
+          <Route path="/account"         element={<AccountPage />} />
           <Route path="*"                element={<HomePage />} />
         </Routes>
       </main>

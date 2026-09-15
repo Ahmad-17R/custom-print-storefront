@@ -12,14 +12,13 @@ export const PAGE_RIGHTS: RightGroup[] = [
     { key: 'products', label: 'Products' },
     { key: 'categories', label: 'Categories' },
     { key: 'brands', label: 'Brands' },
+    { key: 'storefront', label: 'Storefront' },
   ]},
   { section: 'Orders (Online)', items: [
     { key: 'orders', label: 'All Orders' },
     { key: 'online-order-handling', label: 'Order Handling (Online)' },
-    { key: 'quotations', label: 'Quotations' },
+    { key: 'online-order-summary', label: 'Order Summary (Online)' },
     { key: 'sales-invoices', label: 'Sales Invoices' },
-    { key: 'delivery-notes', label: 'Delivery Notes' },
-    { key: 'sales-returns', label: 'Sales Returns' },
     { key: 'credit-notes', label: 'Credit Notes' },
   ]},
   { section: 'Sales & CRM', items: [

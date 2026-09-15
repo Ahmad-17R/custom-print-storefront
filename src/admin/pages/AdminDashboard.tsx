@@ -2,9 +2,121 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AdminLayout, Badge, Table } from '../components/AdminLayout'
 import { api } from '../../lib/api'
+import { useAuth } from '../lib/AuthContext'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
+
+// ── Pending Approvals inbox (owner/HR/purchasing) ───────────────────────────────
+interface ApprovalItem { kind: 'Leave' | 'Advance' | 'Requisition'; id: string; who: string; detail: string; when: string; base: string }
+const KIND_COLOR: Record<string, string> = { Leave: '#8B5CF6', Advance: '#F59E0B', Requisition: '#1D4ED8' }
+const money = (v: string | number) => `AED ${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+
+// ── Owner permission toggles (global settings) ──────────────────────────────────
+const OWNER_TOGGLES = [
+  { key: 'allowEmployeeDiscount', label: 'Allow employees to give discounts', desc: 'Shows a discount field on the walk-in New Sale form for staff. You can always give discounts.' },
+  { key: 'walkInGlobalSales',     label: 'Show all walk-in sales to every employee', desc: 'When off, each employee sees only the sales they created. You always see all sales.' },
+]
+function OwnerToggles() {
+  const { user } = useAuth()
+  const [values, setValues] = useState<Record<string, boolean> | null>(null)
+  const [saving, setSaving] = useState('')
+  useEffect(() => {
+    if (!user?.isOwner) return
+    api.get<{ settings: Record<string, string> }>('/settings')
+      .then(r => setValues(Object.fromEntries(OWNER_TOGGLES.map(t => [t.key, r.settings?.[t.key] === 'true']))))
+      .catch(() => setValues(Object.fromEntries(OWNER_TOGGLES.map(t => [t.key, false]))))
+  }, [user])
+  if (!user?.isOwner || !values) return null
+  const toggle = async (key: string) => {
+    const next = !values[key]
+    setSaving(key); setValues(v => ({ ...v!, [key]: next }))
+    try { await api.patch('/settings', { settings: { [key]: String(next) } }) }
+    catch { setValues(v => ({ ...v!, [key]: !next })) }
+    finally { setSaving('') }
+  }
+  return (
+    <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 12, padding: '16px 20px', marginBottom: 24, fontFamily: FONT }}>
+      <h2 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 12px', color: DARK }}>Owner Permissions</h2>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {OWNER_TOGGLES.map(t => (
+          <label key={t.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, cursor: 'pointer' }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: DARK }}>{t.label}</div>
+              <div style={{ fontSize: 12, color: '#64748B' }}>{t.desc}</div>
+            </div>
+            <button onClick={() => toggle(t.key)} disabled={saving === t.key} style={{ position: 'relative', width: 46, height: 26, borderRadius: 999, border: 'none', cursor: 'pointer', background: values[t.key] ? '#059669' : '#CBD5E1', transition: 'background .15s', flexShrink: 0 }}>
+              <span style={{ position: 'absolute', top: 3, left: values[t.key] ? 23 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left .15s' }} />
+            </button>
+          </label>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function PendingApprovals() {
+  const { can, user } = useAuth()
+  const [items, setItems] = useState<ApprovalItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState('')
+
+  const canApprove = user?.isOwner || can('leave') || can('advances') || can('purchase-requisitions')
+
+  const load = async () => {
+    setLoading(true)
+    try {
+      const [leave, adv, req] = await Promise.all([
+        api.get<{ data: any[] }>('/leave?status=pending&pageSize=50').then(r => r.data).catch(() => []),
+        api.get<{ data: any[] }>('/advances?status=pending&pageSize=50').then(r => r.data).catch(() => []),
+        api.get<{ data: any[] }>('/purchase-requisitions?status=pending_approval&pageSize=50').then(r => r.data).catch(() => []),
+      ])
+      const rows: ApprovalItem[] = [
+        ...leave.map(l => ({ kind: 'Leave' as const, id: l.id, who: l.employee?.name ?? '—', detail: `${l.leaveType} · ${l.days} day(s) · ${String(l.startDate).slice(0, 10)}→${String(l.endDate).slice(0, 10)}`, when: l.createdAt, base: '/leave' })),
+        ...adv.map(a => ({ kind: 'Advance' as const, id: a.id, who: a.employee?.name ?? '—', detail: `${money(a.amount)}${a.reason ? ` · ${a.reason}` : ''}`, when: a.createdAt, base: '/advances' })),
+        ...req.map(r => ({ kind: 'Requisition' as const, id: r.id, who: r.note ?? `${r._count?.items ?? 0} item(s)`, detail: `Needed by ${r.neededBy ? String(r.neededBy).slice(0, 10) : '—'}`, when: r.createdAt, base: '/purchase-requisitions' })),
+      ].sort((a, b) => new Date(a.when).getTime() - new Date(b.when).getTime())
+      setItems(rows)
+    } finally { setLoading(false) }
+  }
+  useEffect(() => { if (canApprove) load() }, [canApprove])
+
+  if (!canApprove) return null
+
+  const act = async (it: ApprovalItem, action: 'approve' | 'reject') => {
+    setBusy(it.id)
+    try { await api.post(`${it.base}/${it.id}/${action}`, {}); await load() }
+    catch { /* keep list */ }
+    finally { setBusy('') }
+  }
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 12, overflow: 'hidden', marginBottom: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #F1F5F9' }}>
+        <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: DARK, fontFamily: FONT }}>
+          Pending Approvals {items.length > 0 && <span style={{ marginLeft: 6, fontSize: 12, background: '#FEF2F2', color: '#DC2626', borderRadius: 999, padding: '2px 9px' }}>{items.length}</span>}
+        </h2>
+      </div>
+      {loading ? <div style={{ padding: 30, color: '#94A3B8', fontFamily: FONT, fontSize: 13 }}>Loading…</div>
+        : items.length === 0 ? <div style={{ padding: 30, color: '#94A3B8', fontFamily: FONT, fontSize: 13, textAlign: 'center' }}>Nothing awaiting approval. 🎉</div>
+        : (
+          <div>
+            {items.map(it => (
+              <div key={`${it.kind}-${it.id}`} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px', borderBottom: '1px solid #F8FAFC', fontFamily: FONT }}>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 999, background: `${KIND_COLOR[it.kind]}18`, color: KIND_COLOR[it.kind], minWidth: 84, textAlign: 'center' }}>{it.kind}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: DARK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.who}</div>
+                  <div style={{ fontSize: 12, color: '#64748B' }}>{it.detail}</div>
+                </div>
+                <button disabled={busy === it.id} onClick={() => act(it, 'approve')} style={{ border: 'none', background: '#059669', color: '#fff', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: FONT }}>{busy === it.id ? '…' : 'Approve'}</button>
+                <button disabled={busy === it.id} onClick={() => act(it, 'reject')} style={{ border: '1px solid #FCA5A5', background: '#fff', color: '#DC2626', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: FONT }}>Reject</button>
+              </div>
+            ))}
+          </div>
+        )}
+    </div>
+  )
+}
 
 // SVG icon components
 const Icon = {
@@ -232,6 +344,12 @@ export function AdminDashboard() {
           </div>
         ))}
       </div>
+
+      {/* Owner permission toggles */}
+      <OwnerToggles />
+
+      {/* Pending approvals (leave / advances / requisitions) */}
+      <PendingApprovals />
 
       {/* Main two-column layout */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 20, alignItems: 'start' }}>

@@ -31,6 +31,40 @@ export const api = {
   delete: <T>(path: string)                  => request<T>('DELETE', path),
 }
 
+// Multipart upload for admin (the JSON `api` helper can't send files).
+async function uploadImage(path: string, file: File): Promise<{ url: string }> {
+  const token = getToken()
+  const form = new FormData()
+  form.append('image', file)
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'POST',
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: form,
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    let message = `POST ${path} → ${res.status}`
+    try { message = JSON.parse(text)?.error ?? message } catch { message = text || message }
+    throw new Error(message)
+  }
+  return res.json() as Promise<{ url: string }>
+}
+
+// Uploads a category tile image → returns its stored path (save as Category.imageUrl).
+export const uploadCategoryImage = (file: File) => uploadImage('/categories/upload-image', file)
+
+// ── Order invoices & credit notes (admin) ──────────────────────────────────────
+export interface OrderInvoice {
+  id: string; invoiceNumber: string; orderId: string; type: 'invoice' | 'credit_note'
+  status: string; issueDate: string; subtotal: string | number; vatAmount: string | number
+  total: string | number; notes?: string | null
+  order?: { orderNumber: string; contactName?: string | null; paymentStatus: string; paymentMethod?: string | null; customer?: { fullName?: string | null; email?: string | null } }
+}
+export const fetchOrderInvoices = (type?: 'invoice' | 'credit_note') =>
+  api.get<{ data: OrderInvoice[] }>(`/order-invoices${type ? `?type=${type}` : ''}`).then(r => r.data)
+export const issueOrderCreditNote = (orderId: string, reason?: string) =>
+  api.post<OrderInvoice>(`/orders/${orderId}/credit-note`, { reason })
+
 // ── Public storefront catalog ──────────────────────────────────────────────────
 // Served under /customer (NOT /api/v1) and public — so no Authorization header.
 // NOTE: Prisma serialises Decimal as a JSON string → basePrice is a string; Number() it.
@@ -55,6 +89,7 @@ export interface CatalogDetailsField {
 export interface CatalogProduct {
   id: string; slug: string; name: string; description: string | null
   basePrice: string
+  editorTemplate?: string | null
   isActive: boolean
   category: { id: string; name: string } | null
   brand: { id: string; name: string } | null
@@ -87,6 +122,38 @@ async function customerGet<T>(path: string, accessToken?: string): Promise<T> {
 
 export const fetchCatalog        = ()             => customerGet<CatalogProduct[]>('/catalog')
 export const fetchCatalogProduct = (slug: string) => customerGet<CatalogProduct>(`/catalog/${slug}`)
+
+export interface CatalogCategory { id: string; name: string; imageUrl: string | null; parentId: string | null }
+export const fetchCatalogCategories = () => customerGet<CatalogCategory[]>('/catalog/categories')
+
+// ── Storefront content (admin-editable) ────────────────────────────────────────
+export interface StorefrontLink { title: string; image: string; href: string }
+export interface StorefrontSettings {
+  announcement: { enabled: boolean; text: string }
+  promo: { enabled: boolean; text: string; code: string; detail: string; ctaLabel: string; ctaHref: string }
+  hero: {
+    headline: string; subtext: string; tagline: string
+    primaryLabel: string; primaryHref: string
+    secondaryLabel: string; secondaryHref: string
+    images: string[]
+  }
+  featured: { title: string; productSlugs: string[] }
+  collections: { enabled: boolean; title: string; items: StorefrontLink[] }
+  mustHaves: { enabled: boolean; title: string; items: StorefrontLink[] }
+  webBanner: {
+    enabled: boolean; eyebrow: string; headline: string; text: string; features: string[]
+    ctaLabel: string; ctaHref: string; secondaryLabel: string; secondaryHref: string
+  }
+  tools: { enabled: boolean }
+  gallery: { enabled: boolean }
+  contact: { phone: string }
+}
+export const fetchStorefront = () => customerGet<StorefrontSettings>('/catalog/storefront')
+
+// Admin: read / save the storefront settings + upload hero/collection images.
+export const getStorefrontSettings  = ()                        => api.get<StorefrontSettings>('/storefront-settings')
+export const saveStorefrontSettings = (s: StorefrontSettings)   => request<StorefrontSettings>('PUT', '/storefront-settings', s)
+export const uploadStorefrontImage  = (file: File)             => uploadImage('/storefront-settings/upload-image', file)
 
 export interface OrderFieldValue {
   id: string; fieldId: string | null; fieldLabel: string; fieldType: string
@@ -124,6 +191,29 @@ export const fetchCustomerOrders = (accessToken: string) => customerGet<Customer
 export const fetchCustomerOrder = (id: string, accessToken: string) => customerGet<CustomerOrder>(`/orders/${id}`, accessToken)
 export const cancelCustomerOrder = (id: string, accessToken: string, note?: string) =>
   customerRequest<CustomerOrder>('POST', `/orders/${id}/cancel`, accessToken, { note })
+
+// ── Customer account (profile + addresses) ─────────────────────────────────────
+export interface CustomerAddress {
+  id: string; label: string; line1: string; line2: string | null
+  city: string; emirate: string; country: string; isDefault: boolean
+}
+export interface CustomerProfile {
+  id: string; email: string; fullName: string | null; phone: string | null
+  companyName: string | null; addresses: CustomerAddress[]
+}
+export type AddressInput = {
+  label?: string; line1: string; line2?: string; city: string; emirate: string; isDefault?: boolean
+}
+
+export const fetchCustomerProfile = (accessToken: string) => customerGet<CustomerProfile>('/me', accessToken)
+export const updateCustomerProfile = (accessToken: string, body: { fullName?: string; phone?: string; companyName?: string }) =>
+  customerRequest<CustomerProfile>('PATCH', '/me', accessToken, body)
+export const addCustomerAddress = (accessToken: string, body: AddressInput) =>
+  customerRequest<CustomerAddress>('POST', '/me/addresses', accessToken, body)
+export const updateCustomerAddress = (accessToken: string, id: string, body: Partial<AddressInput>) =>
+  customerRequest<CustomerAddress>('PATCH', `/me/addresses/${id}`, accessToken, body)
+export const deleteCustomerAddress = (accessToken: string, id: string) =>
+  customerRequest<{ ok?: boolean }>('DELETE', `/me/addresses/${id}`, accessToken)
 
 export async function downloadCustomerAttachment(orderId: string, attachmentId: string, accessToken: string, filename: string) {
   const res = await fetch(`${CUSTOMER_BASE}/orders/${orderId}/attachments/${attachmentId}`, { headers: { Authorization: `Bearer ${accessToken}` } })

@@ -162,7 +162,7 @@ interface ProductEditorProps {
 }
 
 export default function ProductEditor({ initialProductType = "business_card" }: ProductEditorProps) {
-  const [productType, setProductType] = useState(initialProductType);
+  const [productType] = useState(initialProductType);
   const template = TEMPLATES[productType];
   const [activeZoneId, setActiveZoneId] = useState(template.zones[0].id);
   const [layersByZone, setLayersByZone] = useState<Record<string, Layer[]>>({});
@@ -513,6 +513,79 @@ export default function ProductEditor({ initialProductType = "business_card" }: 
     link.click();
   };
 
+  // Render ANY zone (not just the active one) to a print-resolution PNG data URL.
+  const renderZoneToDataURL = async (z: typeof template.zones[number]): Promise<string> => {
+    const key = `${productType}:${z.id}`;
+    const zLayers = layersByZone[key] || [];
+    const zBg = bgByZone[key] || "#ffffff";
+    const zBgGrad = bgGradientByZone[key] ?? null;
+    const zBgImg = bgImageByZone[key] ?? null;
+    const zBgTf = bgImageTransformByZone[key] ?? { scale: 100, offsetX: 50, offsetY: 50 };
+    const zCanvasW = z.width * PX_PER_MM;
+    const mmToPx = template.dpi / 25.4;
+    const outW = Math.round(z.width * mmToPx);
+    const outH = Math.round(z.height * mmToPx);
+    const scale = outW / zCanvasW;
+    const canvas = document.createElement("canvas");
+    canvas.width = outW; canvas.height = outH;
+    const ctx = canvas.getContext("2d")!;
+
+    ctx.save(); ctx.beginPath();
+    if (template.canvasShape === "circle" || template.canvasShape === "oval") ctx.ellipse(outW / 2, outH / 2, outW / 2, outH / 2, 0, 0, Math.PI * 2);
+    else if (template.canvasShape === "rounded") (ctx as unknown as { roundRect: (x: number, y: number, w: number, h: number, r: number) => void }).roundRect(0, 0, outW, outH, (template.cornerRadius ?? 4) * mmToPx);
+    else ctx.rect(0, 0, outW, outH);
+    ctx.clip();
+
+    if (zBgImg) {
+      await new Promise<void>((res) => {
+        const img = new Image();
+        img.onload = () => { const cs = zBgTf.scale / 100; const dw = outW * cs; const dh = (img.height / img.width) * dw; ctx.drawImage(img, (outW - dw) * (zBgTf.offsetX / 100), (outH - dh) * (zBgTf.offsetY / 100), dw, dh); res(); };
+        img.onerror = () => res(); img.src = zBgImg;
+      });
+    } else { ctx.fillStyle = zBgGrad ? applyGradientToCanvas(ctx, zBgGrad, outW, outH) : zBg; ctx.fillRect(0, 0, outW, outH); }
+
+    const sorted = [...zLayers].filter((l) => l.visible).sort((a, b) => a.z - b.z);
+    // Load image layers first
+    await Promise.all(sorted.filter((l) => l.type === "image").map((l) => new Promise<void>((res) => { const im = new window.Image(); im.onload = () => { (l as ImageLayer & { _img?: HTMLImageElement })._img = im; res(); }; im.onerror = () => res(); im.src = (l as ImageLayer).src; })));
+
+    for (const l of sorted) {
+      ctx.save(); ctx.globalAlpha = l.opacity;
+      ctx.translate((l.x + l.w / 2) * scale, (l.y + l.h / 2) * scale); ctx.rotate((l.rotation * Math.PI) / 180);
+      if (l.type === "shape") {
+        ctx.fillStyle = l.gradient ? applyGradientToCanvas(ctx, l.gradient, l.w * scale, l.h * scale, -(l.w / 2) * scale, -(l.h / 2) * scale) : l.fill;
+        const rx = (l.w / 2) * scale, ry = (l.h / 2) * scale, r = Math.min(l.borderRadius * scale, rx, ry);
+        ctx.beginPath();
+        if ((ctx as CanvasRenderingContext2D & { roundRect?: (...a: unknown[]) => void }).roundRect) (ctx as unknown as { roundRect: (x: number, y: number, w: number, h: number, r: number) => void }).roundRect(-rx, -ry, rx * 2, ry * 2, r);
+        else ctx.rect(-rx, -ry, rx * 2, ry * 2);
+        ctx.fill();
+      } else if (l.type === "text") {
+        ctx.font = `${l.fontStyle} ${l.fontWeight} ${l.fontSize * scale}px ${l.fontFamily}`; ctx.fillStyle = l.color; ctx.textAlign = l.textAlign as CanvasTextAlign; ctx.textBaseline = "middle";
+        const tx = l.textAlign === "center" ? 0 : l.textAlign === "right" ? (l.w / 2) * scale : -(l.w / 2) * scale;
+        ctx.fillText(l.text, tx, 0);
+      } else if (l.type === "image") {
+        const im = (l as ImageLayer & { _img?: HTMLImageElement })._img;
+        if (im) { ctx.scale(l.flipH ? -1 : 1, l.flipV ? -1 : 1); ctx.drawImage(im, -(l.w / 2) * scale, -(l.h / 2) * scale, l.w * scale, l.h * scale); }
+      }
+      ctx.restore();
+    }
+    ctx.restore();
+    return canvas.toDataURL("image/png");
+  };
+
+  // Capture every side, stash for the review page, and continue.
+  const goToReview = async () => {
+    try {
+      const shots: Record<string, string> = {};
+      for (const z of template.zones) shots[z.id] = await renderZoneToDataURL(z);
+      sessionStorage.setItem("inkora_design", JSON.stringify({
+        productType, label: template.label,
+        zones: template.zones.map((z) => ({ id: z.id, label: z.label, width: z.width, height: z.height })),
+        shots,
+      }));
+    } catch { /* if capture fails, review falls back to placeholder */ }
+    navigate(`/review?product=${productType}`);
+  };
+
   // ── Canvas shape ──────────────────────────────────────────────────────────
 
   const canvasBorderRadius = (() => {
@@ -536,11 +609,7 @@ export default function ProductEditor({ initialProductType = "business_card" }: 
 
       {/* ── TOP BAR ── */}
       <header style={s.topBar}>
-        <select value={productType} onChange={(e) => setProductType(e.target.value)} style={s.productSelect}>
-          {Object.entries(TEMPLATES).map(([key, t]) => (
-            <option key={key} value={key}>{t.label}</option>
-          ))}
-        </select>
+        <span style={{ ...s.productSelect, display: "inline-flex", alignItems: "center", cursor: "default" }}>{template.label}</span>
 
         <div style={{ display: "flex", gap: 3 }}>
           <button disabled style={{ ...s.iconBtn, color: "#C4C9D4" }} title="Undo — coming soon"><Undo2 size={14} /></button>
@@ -1099,7 +1168,7 @@ export default function ProductEditor({ initialProductType = "business_card" }: 
           {/* CTA */}
           <div style={{ padding: "12px 8px", display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
             <button
-              onClick={() => navigate(`/review?product=${productType}`)}
+              onClick={goToReview}
               title="Review your design"
               style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "9px 8px", background: "#2563EB", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer" }}
             >
