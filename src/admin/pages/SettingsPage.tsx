@@ -88,8 +88,13 @@ export function SettingsPage() {
               <input style={inputStyle} value={form.company.registrationNo} onChange={e => setCompany('registrationNo', e.target.value)} placeholder="e.g. CN-1234567" />
             </label>
             <label style={{ display: 'block', marginBottom: 14 }}>
-              <span style={labelStyle}>VAT / TRN Number</span>
-              <input style={inputStyle} value={s.vatNumber ?? ''} onChange={e => setSetting('vatNumber', e.target.value)} placeholder="e.g. TRN100284765300001" />
+              <span style={labelStyle}>TRN — Tax Registration Number</span>
+              <input style={inputStyle} maxLength={15} value={s.trn ?? s.vatNumber ?? ''} onChange={e => setSetting('trn', e.target.value)} placeholder="15 characters, e.g. 100284765300003" />
+              <span style={{ fontSize: 11, color: '#94A3B8', display: 'block', marginTop: 4 }}>Our VAT registration number (15 characters). Printed on invoices &amp; account statements.</span>
+            </label>
+            <label style={{ display: 'block', marginBottom: 14 }}>
+              <span style={labelStyle}>Corporate Tax Number</span>
+              <input style={inputStyle} value={s.corporateTaxNumber ?? ''} onChange={e => setSetting('corporateTaxNumber', e.target.value)} placeholder="e.g. CT1234567890" />
             </label>
             <label style={{ display: 'block', marginBottom: 14 }}>
               <span style={labelStyle}>Address</span>
@@ -172,9 +177,14 @@ export function SettingsPage() {
               <span style={labelStyle}>Low Stock Alert Threshold (units)</span>
               <input type="number" style={inputStyle} value={s.lowStockThreshold ?? '10'} onChange={e => setSetting('lowStockThreshold', e.target.value)} />
             </label>
-            <label style={{ display: 'block', marginBottom: 0 }}>
+            <label style={{ display: 'block', marginBottom: 14 }}>
               <span style={labelStyle}>Order Number Prefix</span>
               <input style={inputStyle} value={s.orderPrefix ?? 'MPW-'} onChange={e => setSetting('orderPrefix', e.target.value)} />
+            </label>
+            <label style={{ display: 'block', marginBottom: 0 }}>
+              <span style={labelStyle}>Online Deposit for Non-Designable Orders (%)</span>
+              <input type="number" min={1} max={100} style={inputStyle} value={s.onlineDepositPct ?? '50'} onChange={e => setSetting('onlineDepositPct', e.target.value)} />
+              <span style={{ fontSize: 11, color: '#94A3B8', display: 'block', marginTop: 4 }}>Deposit collected online for products that can't be designed in the studio. The balance is recorded later as installments.</span>
             </label>
           </Section>
 

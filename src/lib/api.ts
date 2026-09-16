@@ -149,6 +149,7 @@ export interface StorefrontSettings {
   contact: { phone: string }
 }
 export const fetchStorefront = () => customerGet<StorefrontSettings>('/catalog/storefront')
+export const fetchDepositPolicy = () => customerGet<{ depositPct: number }>('/catalog/deposit-policy')
 
 // Admin: read / save the storefront settings + upload hero/collection images.
 export const getStorefrontSettings  = ()                        => api.get<StorefrontSettings>('/storefront-settings')
@@ -167,6 +168,7 @@ export interface CustomerOrderItem {
   id: string; productId: string; productName: string; unitPrice: string
   quantity: number; total: string; note: string | null
   fieldValues: OrderFieldValue[]; attachments: OrderAttachment[]
+  product?: { slug: string; isActive: boolean } | null
 }
 export interface CustomerOrder {
   id: string; orderNumber: string; status: string; paymentStatus: string
@@ -199,14 +201,14 @@ export interface CustomerAddress {
 }
 export interface CustomerProfile {
   id: string; email: string; fullName: string | null; phone: string | null
-  companyName: string | null; addresses: CustomerAddress[]
+  companyName: string | null; trn: string | null; corporateTaxNumber: string | null; addresses: CustomerAddress[]
 }
 export type AddressInput = {
   label?: string; line1: string; line2?: string; city: string; emirate: string; isDefault?: boolean
 }
 
 export const fetchCustomerProfile = (accessToken: string) => customerGet<CustomerProfile>('/me', accessToken)
-export const updateCustomerProfile = (accessToken: string, body: { fullName?: string; phone?: string; companyName?: string }) =>
+export const updateCustomerProfile = (accessToken: string, body: { fullName?: string; phone?: string; companyName?: string; trn?: string; corporateTaxNumber?: string }) =>
   customerRequest<CustomerProfile>('PATCH', '/me', accessToken, body)
 export const addCustomerAddress = (accessToken: string, body: AddressInput) =>
   customerRequest<CustomerAddress>('POST', '/me/addresses', accessToken, body)
@@ -236,6 +238,19 @@ export async function downloadAdminAttachment(orderId: string, attachmentId: str
 // (/uploads/…) and need the API origin prefixed.
 export const catalogImageUrl = (url?: string | null) =>
   !url ? '' : url.startsWith('http') ? url : `${API_ORIGIN}${url}`
+
+// Upload / replace an order's final print-ready design file (shown on the order + parcel label).
+export async function uploadOrderDesignFile(orderId: string, file: File): Promise<{ designFileUrl: string; designFileName: string }> {
+  const token = getToken()
+  const form = new FormData()
+  form.append('file', file)
+  const res = await fetch(`${BASE}/orders/${orderId}/design-file`, {
+    method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: form,
+  })
+  if (!res.ok) { let m = `Upload failed (${res.status})`; try { m = (await res.json())?.error ?? m } catch { /* ignore */ } throw new Error(m) }
+  return res.json()
+}
+export const deleteOrderDesignFile = (orderId: string) => api.delete(`/orders/${orderId}/design-file`)
 
 // ── Internal (owner + employee) auth — against our own DB, not Supabase ────────
 export interface AuthEmployee {

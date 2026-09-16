@@ -8,7 +8,6 @@ export type ConfigFieldType =
   | 'radio'
   | 'checkbox'
   | 'file_upload'
-  | 'color_picker'
 
 export interface ConfigOption {
   id: string
@@ -34,7 +33,7 @@ export type ConfigSelection = string | string[]
 export type ConfigSelections = Record<string, ConfigSelection>
 
 const FIELD_TYPES = new Set<ConfigFieldType>([
-  'text', 'textarea', 'number', 'dropdown', 'radio', 'checkbox', 'file_upload', 'color_picker',
+  'text', 'textarea', 'number', 'dropdown', 'radio', 'checkbox', 'file_upload',
 ])
 
 function supportedType(type: string): ConfigFieldType | null {

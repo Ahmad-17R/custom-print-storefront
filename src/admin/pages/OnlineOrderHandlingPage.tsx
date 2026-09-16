@@ -1,13 +1,16 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { AdminLayout, StatCard, StatGrid, Badge } from '../components/AdminLayout'
 import { AdminOrderInformation, AdminOrderDetails, type AdminOrderDetail } from '../components/AdminOrderDetails'
-import { api } from '../../lib/api'
+import { api, catalogImageUrl } from '../../lib/api'
+import { TruckIcon } from '../components/icons'
+import { useAuth } from '../lib/AuthContext'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
 const BLUE = '#3B82F6'
 const fmt = (n: number) => Number(n).toLocaleString(undefined, { minimumFractionDigits: 2 })
+const digits = (s?: string | null) => (s ?? '').replace(/[^\d]/g, '')
 
 const HANDLING = ['confirmed', 'in_production', 'ready', 'out_for_delivery'] as const
 const S_LABEL: Record<string, string> = { confirmed: 'Confirmed', in_production: 'In Production', ready: 'Ready', out_for_delivery: 'Out for Delivery', delivered: 'Delivered', cancelled: 'Cancelled', pending: 'Pending' }
@@ -150,9 +153,91 @@ function JobPanel({ orderId, job, suppliers, materials, workers, whStock, onChan
 }
 
 // ── Handling drawer ───────────────────────────────────────────────────────────
+// Installment payments panel — deposit + balance collection, mirroring walk-in sales.
+function PaymentPanel({ order, canRecord, onRecorded }: { order: AdminOrderDetail; canRecord: boolean; onRecorded: () => void }) {
+  const total = Number(order.total)
+  const paid = Number(order.amountPaid ?? 0)
+  const balance = Math.round((total - paid) * 100) / 100
+  const [amount, setAmount] = useState('')
+  const [method, setMethod] = useState('cash')
+  const [note, setNote] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+  const [open, setOpen] = useState(false)
+
+  const record = async () => {
+    setSaving(true); setErr('')
+    try {
+      await api.post(`/orders/${order.id}/payments`, { amount: Number(amount), method, note: note.trim() || undefined, type: 'installment' })
+      setAmount(''); setNote(''); setOpen(false); onRecorded()
+    } catch (e: any) { setErr(e?.message ?? 'Could not record payment') } finally { setSaving(false) }
+  }
+
+  const pill = (label: string, value: string, color: string) => (
+    <div style={{ flex: 1, textAlign: 'center' }}><div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600 }}>{label}</div><div style={{ fontSize: 15, fontWeight: 800, color }}>{value}</div></div>
+  )
+  const phone = digits(order.contactPhone)
+  const email = order.contactEmail ?? order.customer?.email ?? ''
+
+  return (
+    <div style={{ padding: '14px 20px', borderBottom: '1px solid #F1F5F9' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <span style={{ fontWeight: 700, fontSize: 14, color: DARK }}>Payments</span>
+        {order.requiresDeposit && <span style={{ fontSize: 11, fontWeight: 700, color: '#B45309', background: '#FEF3C7', padding: '2px 8px', borderRadius: 999 }}>Deposit order · balance in installments</span>}
+      </div>
+      <div style={{ display: 'flex', gap: 8, padding: '10px 0', borderTop: '1px solid #F8FAFC', borderBottom: '1px solid #F1F5F9', marginBottom: 10 }}>
+        {pill('Total', `AED ${fmt(total)}`, DARK)}
+        {pill('Paid', `AED ${fmt(paid)}`, '#059669')}
+        {pill('Balance', `AED ${fmt(balance)}`, balance > 0 ? '#DC2626' : '#059669')}
+      </div>
+
+      {order.payments && order.payments.length > 0 && (
+        <div style={{ marginBottom: 10 }}>
+          {order.payments.map(p => (
+            <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#475569', padding: '3px 0' }}>
+              <span style={{ textTransform: 'capitalize' }}>{p.type} · {p.method}{p.recordedBy ? ` · ${p.recordedBy.name}` : ''}</span>
+              <span style={{ fontWeight: 600 }}>AED {fmt(Number(p.amount))} · {new Date(p.paidAt).toLocaleDateString()}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {balance > 0 && (phone || email) && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+          {phone && <a href={`https://wa.me/${phone}?text=${encodeURIComponent(`Hello, regarding your order ${order.orderNumber}: the remaining balance is AED ${balance.toFixed(2)}.`)}`} target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 600, color: '#059669', textDecoration: 'none', border: '1px solid #A7F3D0', borderRadius: 8, padding: '5px 10px' }}>WhatsApp balance</a>}
+          {email && <a href={`mailto:${email}?subject=${encodeURIComponent(`Invoice for order ${order.orderNumber}`)}&body=${encodeURIComponent(`Your remaining balance is AED ${balance.toFixed(2)}.`)}`} style={{ fontSize: 12, fontWeight: 600, color: '#2563EB', textDecoration: 'none', border: '1px solid #BFDBFE', borderRadius: 8, padding: '5px 10px' }}>Email invoice</a>}
+        </div>
+      )}
+
+      {balance <= 0 ? <div style={{ fontSize: 12, color: '#059669', fontWeight: 600 }}>Fully paid ✓</div>
+        : !canRecord ? <div style={{ fontSize: 11, color: '#94A3B8' }}>You do not have permission to record payments.</div>
+        : !open ? <button onClick={() => { setOpen(true); setAmount(String(balance)) }} style={{ background: DARK, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>+ Record payment</button>
+        : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: '#F8FAFC', padding: 12, borderRadius: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div><label style={{ fontSize: 11, fontWeight: 600, color: '#64748B' }}>Amount (AED)</label><input type="number" min={0} step="0.01" value={amount} onChange={e => setAmount(e.target.value)} style={inp} /></div>
+              <div><label style={{ fontSize: 11, fontWeight: 600, color: '#64748B' }}>Method</label>
+                <select value={method} onChange={e => setMethod(e.target.value)} style={inp}><option value="cash">Cash</option><option value="card">Card</option><option value="bank">Bank transfer</option></select>
+              </div>
+            </div>
+            <div><label style={{ fontSize: 11, fontWeight: 600, color: '#64748B' }}>Note (optional)</label><input value={note} onChange={e => setNote(e.target.value)} style={inp} placeholder="e.g. 2nd installment" /></div>
+            {err && <div style={{ color: '#EF4444', fontSize: 12 }}>{err}</div>}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => { setOpen(false); setErr('') }} style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={record} disabled={saving || !amount} style={{ background: '#059669', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 16px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>{saving ? 'Saving…' : 'Record'}</button>
+            </div>
+          </div>
+        )}
+    </div>
+  )
+}
+
 function OrderDrawer({ orderId, warehouses, suppliers, materials, onClose, onUpdated }: {
   orderId: string; warehouses: Ref[]; suppliers: Ref[]; materials: { id: string; name: string; unit: string }[]; onClose: () => void; onUpdated: () => void
 }) {
+  const navigate = useNavigate()
+  const { can } = useAuth()
+  const canRecord = can('feature.record_payments')
   const [order, setOrder]   = useState<OnlineOrder | null>(null)
   const [workers, setWorkers] = useState<Worker[]>([])
   const [whStock, setWhStock] = useState<Record<string, number>>({})
@@ -201,8 +286,9 @@ function OrderDrawer({ orderId, warehouses, suppliers, materials, onClose, onUpd
           <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: DARK }}>{order.orderNumber}</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#94A3B8' }}>×</button>
         </div>
-        <AdminOrderInformation order={order} />
-        <div style={{ marginTop: 40, textAlign: 'center', maxWidth: 380, margin: '40px auto 0' }}>
+        <AdminOrderInformation order={order} onUpdated={reloadAll} />
+        <PaymentPanel order={order} canRecord={canRecord} onRecorded={reloadAll} />
+        <div style={{ marginTop: 24, textAlign: 'center', maxWidth: 380, margin: '24px auto 0' }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: DARK, marginBottom: 8 }}>Which warehouse is handling this order?</div>
           <div style={{ fontSize: 13, color: '#64748B', marginBottom: 20, lineHeight: 1.6 }}>Workers and materials come from the warehouse you pick. Changeable until work begins.</div>
           <select value={whPick} onChange={e => setWhPick(e.target.value)} style={{ ...inp, marginBottom: 12 }}>
@@ -229,12 +315,14 @@ function OrderDrawer({ orderId, warehouses, suppliers, materials, onClose, onUpd
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', borderBottom: '1px solid #F1F5F9' }}>
         {[
           { l: 'Order Total', v: `AED ${fmt(Number(order.total))}`, c: DARK },
-          { l: 'Payment', v: order.paymentStatus === 'paid' ? 'Paid ✓' : order.paymentStatus, c: '#10B981' },
+          { l: 'Balance', v: `AED ${fmt(Number(order.total) - Number(order.amountPaid ?? 0))}`, c: (Number(order.total) - Number(order.amountPaid ?? 0)) > 0 ? '#DC2626' : '#10B981' },
           { l: 'Status', v: S_LABEL[order.status] ?? order.status, c: S_COLOR[order.status] ?? DARK },
         ].map(x => <div key={x.l} style={{ padding: '12px 16px', textAlign: 'center', borderRight: '1px solid #F1F5F9' }}><div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600 }}>{x.l}</div><div style={{ fontSize: 14, fontWeight: 700, color: x.c }}>{x.v}</div></div>)}
       </div>
 
-      <AdminOrderInformation order={order} />
+      <AdminOrderInformation order={order} onUpdated={reloadAll} />
+
+      <PaymentPanel order={order} canRecord={canRecord} onRecorded={reloadAll} />
 
       {/* Warehouse bar */}
       <div style={{ padding: '8px 20px', borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', gap: 10, background: '#F8FAFC' }}>
@@ -244,14 +332,20 @@ function OrderDrawer({ orderId, warehouses, suppliers, materials, onClose, onUpd
           : <select value={order.handlingWarehouseId ?? ''} onChange={e => setWarehouse(e.target.value)} style={{ marginLeft: 'auto', padding: '5px 10px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: 12, fontFamily: FONT }}>{warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}</select>}
       </div>
 
-      {/* Delivered action */}
+      {/* Ship / deliver action */}
       {order.status !== 'delivered' && order.status !== 'cancelled' && (
-        <div style={{ padding: '10px 20px', borderBottom: '1px solid #F1F5F9' }}>
-          <button onClick={markDelivered} disabled={order.status !== 'ready'} title={order.status !== 'ready' ? 'All jobs must be done first' : undefined}
-            style={{ background: order.status === 'ready' ? '#059669' : '#E2E8F0', color: order.status === 'ready' ? '#fff' : '#94A3B8', border: 'none', borderRadius: 8, padding: '7px 18px', fontSize: 12, fontWeight: 700, cursor: order.status === 'ready' ? 'pointer' : 'not-allowed' }}>
+        <div style={{ padding: '10px 20px', borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {order.status === 'ready' && (
+            <button onClick={() => navigate(`/admin/shipments?newOrder=${orderId}`)} title="Create a shipment for this order"
+              style={{ background: '#059669', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 18px', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <TruckIcon /> Create Shipment →
+            </button>
+          )}
+          <button onClick={markDelivered} disabled={order.status !== 'ready'} title={order.status !== 'ready' ? 'All jobs must be done first' : 'Mark delivered without a shipment record'}
+            style={{ background: '#fff', color: order.status === 'ready' ? '#059669' : '#94A3B8', border: `1px solid ${order.status === 'ready' ? '#059669' : '#E2E8F0'}`, borderRadius: 8, padding: '7px 18px', fontSize: 12, fontWeight: 700, cursor: order.status === 'ready' ? 'pointer' : 'not-allowed' }}>
             Mark Delivered
           </button>
-          {order.status !== 'ready' && <span style={{ fontSize: 11, color: '#64748B', marginLeft: 10 }}>Auto-advances as jobs progress ({done}/{order.jobs.length} done)</span>}
+          {order.status !== 'ready' && <span style={{ fontSize: 11, color: '#64748B' }}>Ships once all jobs are done ({done}/{order.jobs.length} done)</span>}
         </div>
       )}
 
@@ -290,6 +384,7 @@ export function OnlineOrderHandlingPage() {
     api.get<{ data: { id: string; name: string; unit: string }[] }>('/materials?pageSize=500').then(r => setMat(r.data))
   }, [])
 
+  const navigate = useNavigate()
   const openDrawer = (id: string) => setParams(p => { const n = new URLSearchParams(p); n.set('order', id); n.delete('view'); return n })
   const closeDrawer = () => setParams(p => { const n = new URLSearchParams(p); n.delete('order'); return n })
   const openView = (id: string) => setParams(p => { const n = new URLSearchParams(p); n.set('view', id); n.delete('order'); return n })
@@ -324,7 +419,10 @@ export function OnlineOrderHandlingPage() {
               const unassigned = o.jobs.filter(j => j.type === 'in_house' && !j.assignedTo && j.status !== 'done').length
               return (
                 <div key={o.id} style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 18 }}>
-                  <div style={{ minWidth: 180 }}>
+                  {o.designFileUrl
+                    ? <img src={catalogImageUrl(o.designFileUrl)} alt="design" title={`Design: ${o.designFileName ?? ''}`} style={{ width: 38, height: 38, borderRadius: 8, objectFit: 'cover', border: '1px solid #E2E8F0', flexShrink: 0 }} />
+                    : <div title="No design file" style={{ width: 38, height: 38, borderRadius: 8, border: '1px dashed #CBD5E1', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: '#94A3B8', textAlign: 'center', lineHeight: 1.1 }}>no art</div>}
+                  <div style={{ minWidth: 165 }}>
                     <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: DARK }}>{o.orderNumber}</div>
                     <div style={{ fontFamily: FONT, fontSize: 12, color: '#64748B' }}>{o.customer?.fullName ?? o.customer?.email ?? 'Online'}</div>
                   </div>
@@ -338,11 +436,16 @@ export function OnlineOrderHandlingPage() {
                     <div style={{ height: 6, background: '#E2E8F0', borderRadius: 3, overflow: 'hidden' }}><div style={{ height: '100%', width: `${pct}%`, background: pct === 100 ? '#10B981' : '#3B82F6', borderRadius: 3 }} /></div>
                   </div>
                   {unassigned > 0 && <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 999, background: '#FEF2F2', color: '#DC2626' }}>{unassigned} unassigned</span>}
-                  <div style={{ minWidth: 100, textAlign: 'right', fontFamily: FONT, fontSize: 13, fontWeight: 700, color: DARK }}>AED {fmt(Number(o.total))}</div>
+                  <div style={{ minWidth: 100, textAlign: 'right', fontFamily: FONT }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: DARK }}>AED {fmt(Number(o.total))}</div>
+                    {(Number(o.total) - Number(o.amountPaid ?? 0)) > 0.001 && Number(o.amountPaid ?? 0) > 0 && <div style={{ fontSize: 10, color: '#DC2626', fontWeight: 600 }}>Bal AED {fmt(Number(o.total) - Number(o.amountPaid ?? 0))}</div>}
+                  </div>
                   <button onClick={() => openView(o.id)} style={{ background: '#fff', color: DARK, border: '1px solid #CBD5E1', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 600, fontFamily: FONT, cursor: 'pointer' }}>View</button>
-                  {total > 0
-                    ? <button onClick={() => openDrawer(o.id)} style={{ background: DARK, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 700, fontFamily: FONT, cursor: 'pointer' }}>Order Handling →</button>
-                    : <span title="No production jobs — set the status from View" style={{ fontSize: 11, color: '#94A3B8', fontFamily: FONT, minWidth: 110, textAlign: 'center' }}>No jobs · set status in View</span>}
+                  {o.status === 'ready'
+                    ? <button onClick={() => navigate(`/admin/shipments?newOrder=${o.id}`)} title="Create a shipment for this order" style={{ background: '#059669', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 700, fontFamily: FONT, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}><TruckIcon /> Ship →</button>
+                    : total > 0
+                      ? <button onClick={() => openDrawer(o.id)} style={{ background: DARK, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 700, fontFamily: FONT, cursor: 'pointer' }}>Order Handling →</button>
+                      : <span title="No production jobs — set the status from View" style={{ fontSize: 11, color: '#94A3B8', fontFamily: FONT, minWidth: 110, textAlign: 'center' }}>No jobs · set status in View</span>}
                 </div>
               )
             })}

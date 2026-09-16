@@ -100,6 +100,7 @@ export const FEATURE_RIGHTS: RightItem[] = [
   { key: 'feature.discounts',       label: 'Can apply discounts' },
   { key: 'feature.stock_adjust',    label: 'Can adjust stock (write-offs / counts)' },
   { key: 'feature.edit_confirmed',  label: 'Can edit an order after it is confirmed' },
+  { key: 'feature.edit_shipment',   label: 'Can edit a shipment after it is created (carrier, route, tracking, status)' },
   { key: 'feature.delete',          label: 'Can delete / void records' },
 ]
 
@@ -114,8 +115,8 @@ export const PRESETS: Record<string, string[]> = {
   ],
   'Warehouse Staff': [
     'dashboard', 'materials', 'stock', 'stock-in', 'warehouses', 'stock-adjustments', 'stock-transfers',
-    'goods-receipts', 'order-handling', 'online-order-handling',
-    'feature.stock_adjust',
+    'goods-receipts', 'order-handling', 'online-order-handling', 'carriers', 'shipments',
+    'feature.stock_adjust', 'feature.edit_shipment',
   ],
   'Finance Officer': [
     'dashboard', 'reports', 'accounts', 'journals', 'bank-accounts', 'tax-rates', 'fiscal-periods',

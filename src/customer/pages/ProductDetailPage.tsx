@@ -384,8 +384,6 @@ function ConfigFieldControl({
         {stringValue && <div style={{ fontSize: 12, color: '#1D4ED8', marginTop: 5 }}>Selected: {stringValue}</div>}
       </div>
     )
-  } else if (field.type === 'color_picker') {
-    control = <input type="color" value={stringValue || '#000000'} onChange={event => onChange(event.target.value)} style={{ ...inputStyle, width: 64, height: 42, padding: 4, cursor: 'pointer' }} />
   } else {
     control = <input type={field.type === 'number' ? 'number' : 'text'} value={stringValue} onChange={event => onChange(event.target.value)} placeholder={field.placeholder} style={inputStyle} />
   }

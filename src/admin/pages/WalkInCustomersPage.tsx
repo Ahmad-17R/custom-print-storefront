@@ -7,7 +7,7 @@ const DARK = '#0F172A'
 
 interface Customer {
   id: string; name: string; phone: string | null; email: string | null
-  company: string | null; notes: string | null; tags: string[]
+  company: string | null; trn: string | null; corporateTaxNumber: string | null; notes: string | null; tags: string[]
   isActive: boolean; createdAt: string
   _count: { sales: number; noteLog: number }
 }
@@ -29,6 +29,8 @@ function CustomerModal({ initial, onClose, onSave }: { initial?: Customer; onClo
   const [phone,   setPhone]   = useState(initial?.phone   ?? '')
   const [email,   setEmail]   = useState(initial?.email   ?? '')
   const [company, setCompany] = useState(initial?.company ?? '')
+  const [trn,     setTrn]     = useState(initial?.trn     ?? '')
+  const [corporateTaxNumber, setCorporateTaxNumber] = useState(initial?.corporateTaxNumber ?? '')
   const [notes,   setNotes]   = useState(initial?.notes   ?? '')
   const [tag,     setTag]     = useState('')
   const [tags,    setTags]    = useState<string[]>(initial?.tags ?? [])
@@ -40,9 +42,9 @@ function CustomerModal({ initial, onClose, onSave }: { initial?: Customer; onClo
     setSaving(true)
     try {
       if (initial) {
-        await api.patch(`/walk-in-customers/${initial.id}`, { name, phone: phone || null, email: email || null, company: company || null, notes: notes || null, tags })
+        await api.patch(`/walk-in-customers/${initial.id}`, { name, phone: phone || null, email: email || null, company: company || null, trn: trn || null, corporateTaxNumber: corporateTaxNumber || null, notes: notes || null, tags })
       } else {
-        await api.post('/walk-in-customers', { name, phone: phone || null, email: email || null, company: company || null, notes: notes || null, tags })
+        await api.post('/walk-in-customers', { name, phone: phone || null, email: email || null, company: company || null, trn: trn || null, corporateTaxNumber: corporateTaxNumber || null, notes: notes || null, tags })
       }
       onSave(); onClose()
     } catch (e: any) { setErr(e.message ?? 'Error') }
@@ -58,6 +60,8 @@ function CustomerModal({ initial, onClose, onSave }: { initial?: Customer; onClo
           <label>{lbl('Phone')}<input value={phone} onChange={e => setPhone(e.target.value)} style={inp} placeholder="+971 …" /></label>
           <label>{lbl('Email')}<input value={email} onChange={e => setEmail(e.target.value)} style={inp} /></label>
           <label style={{ gridColumn: '1/-1' }}>{lbl('Company / Business')}<input value={company} onChange={e => setCompany(e.target.value)} style={inp} /></label>
+          <label>{lbl('TRN (Tax Reg. No.)')}<input value={trn} maxLength={15} onChange={e => setTrn(e.target.value)} style={inp} placeholder="15 characters" /></label>
+          <label>{lbl('Corporate Tax No.')}<input value={corporateTaxNumber} onChange={e => setCorporateTaxNumber(e.target.value)} style={inp} /></label>
           <label style={{ gridColumn: '1/-1' }}>{lbl('Notes')}<textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} style={{ ...inp, resize: 'vertical' }} /></label>
         </div>
         <div style={{ marginBottom: 14 }}>
@@ -119,6 +123,8 @@ function DetailDrawer({ customer, onClose, onEdit, onRefresh }: { customer: Cust
             {customer.phone   && <div style={{ fontSize: 13, color: '#64748B', marginTop: 2 }}>📞 {customer.phone}</div>}
             {customer.email   && <div style={{ fontSize: 13, color: '#64748B' }}>✉️ {customer.email}</div>}
             {customer.company && <div style={{ fontSize: 13, color: '#64748B' }}>🏢 {customer.company}</div>}
+            {customer.trn && <div style={{ fontSize: 13, color: '#64748B' }}>TRN: {customer.trn}</div>}
+            {customer.corporateTaxNumber && <div style={{ fontSize: 13, color: '#64748B' }}>Corporate Tax: {customer.corporateTaxNumber}</div>}
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             <Btn label="Edit" variant="secondary" onClick={onEdit} />

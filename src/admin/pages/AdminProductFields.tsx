@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../../lib/api'
 
-type FieldType = 'text' | 'textarea' | 'number' | 'dropdown' | 'radio' | 'checkbox' | 'file_upload' | 'color_picker'
+type FieldType = 'text' | 'textarea' | 'number' | 'dropdown' | 'radio' | 'checkbox' | 'file_upload'
 
 interface FieldOption { id: string; label: string; value: string; priceModifier: number; sortOrder: number }
 interface Field { id: string; label: string; type: FieldType; isRequired: boolean; askAtCheckout: boolean; helpText: string; sortOrder: number; options: FieldOption[] }
@@ -14,7 +14,6 @@ const FIELD_TYPES: { value: FieldType; label: string }[] = [
   { value: 'text',        label: 'Text input' },
   { value: 'textarea',    label: 'Text area' },
   { value: 'number',      label: 'Number' },
-  { value: 'color_picker', label: 'Colour picker' },
   { value: 'file_upload', label: 'File upload' },
 ]
 

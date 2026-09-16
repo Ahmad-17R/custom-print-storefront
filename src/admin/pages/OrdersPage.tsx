@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AdminLayout, Table, SearchInput, Badge, StatCard, StatGrid } from '../components/AdminLayout'
 import { AdminOrderDetails, type AdminOrderDetail } from '../components/AdminOrderDetails'
-import { api } from '../../lib/api'
+import { api, catalogImageUrl } from '../../lib/api'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
@@ -9,6 +9,7 @@ const labels: Record<string, string> = { pending: 'Pending', confirmed: 'Confirm
 const colors: Record<string, string> = { pending: '#F59E0B', confirmed: '#1D4ED8', in_production: '#8B5CF6', ready: '#10B981', out_for_delivery: '#F59E0B', delivered: '#047857', cancelled: '#EF4444', refunded: '#DC2626' }
 const statuses = Object.keys(labels)
 const columns = [
+  { key: 'design', label: 'Design', width: 60 },
   { key: 'orderNumber', label: 'Order Number', width: 190 }, { key: 'customerName', label: 'Customer' },
   { key: 'itemsCount', label: 'Items', width: 70 }, { key: 'totalDisplay', label: 'Total', width: 120 },
   { key: 'paymentDisplay', label: 'Payment', width: 150 }, { key: 'statusDisplay', label: 'Status', width: 130 },
@@ -32,6 +33,9 @@ export function OrdersPage() {
   useEffect(() => { load() }, [status])
   const filtered = orders.filter(order => `${order.orderNumber} ${order.contactName ?? ''} ${order.customer?.email ?? ''}`.toLowerCase().includes(query.toLowerCase()))
   const rows = filtered.map(order => ({
+    design: order.designFileUrl
+      ? <img src={catalogImageUrl(order.designFileUrl)} alt="design" title={order.designFileName ?? 'design'} style={{ width: 34, height: 34, borderRadius: 6, objectFit: 'cover', border: '1px solid #E2E8F0' }} />
+      : <span title="No design file" style={{ display: 'inline-block', width: 34, height: 34, borderRadius: 6, border: '1px dashed #CBD5E1' }} />,
     orderNumber: order.orderNumber,
     customerName: order.contactName ?? order.customer?.fullName ?? order.customer?.email ?? '—',
     itemsCount: order.items.length,

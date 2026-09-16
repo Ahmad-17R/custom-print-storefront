@@ -380,7 +380,7 @@ export function HomePage() {
                     <div style={{ fontSize: 11, color: '#94A3B8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.email}</div>
                   </div>
                   {[
-                    { label: 'My Orders', href: '/orders' },
+                    { label: 'My Orders', href: '/account?tab=orders' },
                     { label: 'Account Settings', href: '/account' },
                   ].map(it => (
                     <div key={it.label} onMouseDown={e => { e.preventDefault(); setProfileOpen(false); navigate(it.href) }}

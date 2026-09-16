@@ -134,8 +134,7 @@ function ItemFields({ productId, selections, onChange, onModifierTotal }: { prod
             </div>
           )}
           {f.type === 'textarea' && <textarea value={(s(f.id) as string) ?? ''} onChange={e => set(f.id, e.target.value)} rows={2} placeholder={f.placeholder ?? ''} style={{ ...inp, resize: 'vertical' }} />}
-          {f.type === 'color_picker' && <input type="color" value={(s(f.id) as string) || '#000000'} onChange={e => set(f.id, e.target.value)} style={{ ...inp, height: 34, padding: 3 }} />}
-          {!['dropdown', 'radio', 'checkbox', 'textarea', 'color_picker'].includes(f.type) && (
+          {!['dropdown', 'radio', 'checkbox', 'textarea'].includes(f.type) && (
             <input type={f.type === 'number' ? 'number' : 'text'} value={(s(f.id) as string) ?? ''} onChange={e => set(f.id, e.target.value)} placeholder={f.placeholder ?? ''} style={inp} />
           )}
         </label>
