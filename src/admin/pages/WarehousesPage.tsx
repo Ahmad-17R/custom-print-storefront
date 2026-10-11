@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react'
 import { AdminLayout, Table, Btn, SearchInput, Badge, StatCard, StatGrid } from '../components/AdminLayout'
 import { api } from '../../lib/api'
+import { useAuth } from '../lib/AuthContext'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
 
 interface Warehouse {
   id: string; name: string; city: string | null; address: string | null
-  contact: string | null; isActive: boolean; createdAt: string
+  contact: string | null; isActive: boolean; isDefault: boolean; createdAt: string
 }
 
 const inp: React.CSSProperties = {
@@ -65,6 +66,8 @@ function Modal({ wh, onClose, onSave }: { wh: Partial<Warehouse> | null; onClose
 }
 
 export function WarehousesPage() {
+  const { can } = useAuth()
+  const canDefault = can('feature.default_warehouse')
   const [data, setData]   = useState<Warehouse[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ]         = useState('')
@@ -85,6 +88,16 @@ export function WarehousesPage() {
     catch (e: unknown) { alert(e instanceof Error ? e.message : 'Update failed') }
   }
 
+  // Only one default; turning it off means every order / receipt picks its warehouse manually
+  const toggleDefault = async (w: Warehouse) => {
+    const on = !w.isDefault
+    if (!window.confirm(on
+      ? `Make "${w.name}" the default warehouse?\nNew walk-in sales and online orders will be handled from it automatically.`
+      : `Turn off "${w.name}" as the default warehouse?\nWarehouses will then be chosen manually.`)) return
+    try { await api.patch(`/warehouses/${w.id}/default`, { isDefault: on }); load() }
+    catch (e: unknown) { alert(e instanceof Error ? e.message : 'Update failed') }
+  }
+
   const filtered = data.filter(w =>
     w.name.toLowerCase().includes(q.toLowerCase()) ||
     (w.city ?? '').toLowerCase().includes(q.toLowerCase()) ||
@@ -99,11 +112,11 @@ export function WarehousesPage() {
     { key: 'address', label: 'Address', width: 260 },
     { key: 'contact', label: 'Contact', width: 150 },
     { key: 'status',  label: 'Status',  width: 90  },
-    { key: 'actions', label: '',        width: 140 },
+    { key: 'actions', label: '',        width: 240 },
   ]
 
   const rows = filtered.map(w => ({
-    name:    w.name,
+    name:    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>{w.name}{w.isDefault && <Badge label="Default" color="#1D4ED8" />}</span>,
     city:    w.city ?? '—',
     address: w.address ? (w.address.length > 45 ? w.address.slice(0, 42) + '…' : w.address) : '—',
     contact: w.contact ?? '—',
@@ -114,6 +127,11 @@ export function WarehousesPage() {
         <button onClick={() => toggleStatus(w)} style={{ ...btnBase, border: '1px solid #FED7AA', background: '#FFF7ED', color: '#EA580C' }}>
           {w.isActive ? 'Disable' : 'Enable'}
         </button>
+        {canDefault && w.isActive && (
+          <button onClick={() => toggleDefault(w)} style={{ ...btnBase, border: '1px solid #BFDBFE', background: w.isDefault ? '#1D4ED8' : '#EFF6FF', color: w.isDefault ? '#fff' : '#1D4ED8' }}>
+            {w.isDefault ? 'Default: ON' : 'Set default'}
+          </button>
+        )}
       </div>
     ),
   }))
@@ -132,6 +150,7 @@ export function WarehousesPage() {
         <StatCard label="Total Locations" value={String(data.length)}                        sub="All warehouses / branches" />
         <StatCard label="Active"          value={String(data.filter(w => w.isActive).length)} sub="Currently operating" color="#10B981" />
         <StatCard label="Inactive"        value={String(data.filter(w => !w.isActive).length)} sub="Disabled" color="#EF4444" />
+        <StatCard label="Default"         value={data.find(w => w.isDefault)?.name ?? 'Off'}   sub={data.some(w => w.isDefault) ? 'Auto-used for new orders' : 'Chosen manually per order'} color="#1D4ED8" />
       </StatGrid>
       {loading
         ? <div style={{ textAlign: 'center', padding: 40, color: '#94A3B8', fontFamily: FONT }}>Loading…</div>

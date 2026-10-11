@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AdminLayout, Table, SearchInput, Badge, StatCard, StatGrid } from '../components/AdminLayout'
 import { api } from '../../lib/api'
+import { today } from '../lib/date'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
@@ -70,7 +71,7 @@ function ProjectModal({ project, onClose, onSaved }: { project?: Project; onClos
   const [name, setName]         = useState(project?.name ?? '')
   const [description, setDesc]  = useState(project?.description ?? '')
   const [status, setStatus]     = useState<ProjStatus>(project?.status ?? 'planning')
-  const [startDate, setStart]   = useState(project?.startDate?.slice(0, 10) ?? '')
+  const [startDate, setStart]   = useState(project?.startDate?.slice(0, 10) ?? (project ? '' : today()))
   const [endDate, setEnd]       = useState(project?.endDate?.slice(0, 10) ?? '')
   const [saving, setSaving]     = useState(false)
   const [error, setError]       = useState('')

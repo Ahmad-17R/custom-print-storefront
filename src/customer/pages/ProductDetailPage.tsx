@@ -2,7 +2,9 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../../context/CartContext'
 import { CATALOG_PRODUCTS } from './CatalogPage'
-import { fetchCatalogProduct, catalogImageUrl, type CatalogProduct } from '../../lib/api'
+import { fetchCatalogProduct, catalogImageUrl, portal, type CatalogProduct } from '../../lib/api'
+import { useAuth } from '../../context/AuthContext'
+import { useShopVat, vatTag } from '../../lib/shopVat'
 import {
   configuredPrice,
   hasQuantityField,
@@ -401,6 +403,7 @@ function ConfigFieldControl({
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export function ProductDetailPage() {
+  const shopVat = useShopVat()
   const { slug } = useParams<{ slug: string }>()
   const navigate  = useNavigate()
   const { addItem } = useCart()
@@ -455,7 +458,14 @@ export function ProductDetailPage() {
     setFormError('')
   }, [configFields])
 
-  const configured = configuredPrice(product.basePrice, configFields, selections)
+  // Signed-in customer with a customer type (special rates) → their own price
+  const { session } = useAuth()
+  const [myRate, setMyRate] = useState<{ group: string; price: number } | null>(null)
+  useEffect(() => {
+    if (!session?.access_token || !apiProduct?.id) { setMyRate(null); return }
+    portal.myPrices(session.access_token).then(r => { const p = r.prices[apiProduct.id]; setMyRate(p && r.group ? { group: r.group.name, price: p.price } : null) }).catch(() => {})
+  }, [session, apiProduct?.id])
+  const configured = configuredPrice(myRate?.price ?? product.basePrice, configFields, selections)
   const hasConfiguredQuantity = hasQuantityField(configFields)
   const price = Math.round(configured * (hasConfiguredQuantity ? 1 : Math.max(1, qty / 100)))
 
@@ -676,7 +686,8 @@ export function ProductDetailPage() {
 
               <div style={{ marginBottom: 18 }}>
                 <span style={{ fontSize: 30, fontWeight: 800, color: '#0F172A', fontFamily: "'Poppins', system-ui" }}>AED {price}</span>
-                <span style={{ fontSize: 13, color: '#64748B', fontFamily: 'system-ui', marginLeft: 8 }}>incl. 5% VAT</span>
+                <span style={{ fontSize: 13, color: '#64748B', fontFamily: 'system-ui', marginLeft: 8 }}>{vatTag(shopVat)}</span>
+                {myRate && <div style={{ fontSize: 12, color: '#059669', fontWeight: 700, fontFamily: 'system-ui', marginTop: 4 }}>Your {myRate.group} price (catalogue AED {product.basePrice})</div>}
               </div>
 
               <p style={{ fontSize: 14, color: '#475569', fontFamily: 'system-ui', lineHeight: 1.65, marginBottom: 20, paddingBottom: 18, borderBottom: '1px solid #F1F5F9' }}>

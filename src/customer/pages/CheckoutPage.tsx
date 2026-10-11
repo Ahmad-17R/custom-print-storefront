@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSPropert
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useCart, type CartItem } from '../../context/CartContext'
-import { createCustomerOrder, fetchCatalogProduct, uploadCustomerFile, fetchCustomerProfile, fetchDepositPolicy, type CatalogProduct, type CustomerAddress } from '../../lib/api'
+import { createCustomerOrder, portal, fetchCatalogProduct, uploadCustomerFile, fetchCustomerProfile, fetchDepositPolicy, type CatalogProduct, type CustomerAddress } from '../../lib/api'
+import { useShopVat, vatInside } from '../../lib/shopVat'
 import {
   configuredPrice, initialSelections, mapCatalogFields, missingRequiredFields,
   optionDisplayLabel, type ConfigField, type ConfigSelection, type ConfigSelections,
@@ -126,12 +127,19 @@ export function CheckoutDialog({ onClose }: { onClose: () => void }) {
     return () => { cancelled = true }
   }, [session])
 
+  // Customer type special rates (same as the order engine charges)
+  const [myPrices, setMyPrices] = useState<Record<string, { base: number; price: number }>>({})
+  useEffect(() => {
+    if (!session?.access_token) return
+    portal.myPrices(session.access_token).then(r => setMyPrices(r.prices)).catch(() => {})
+  }, [session])
   const linePrice = (line: CheckoutLine) => {
     const productSelections = Object.fromEntries((line.cart.selections ?? []).map(selection => [selection.fieldId, selection.value]))
-    return configuredPrice(Number(line.product.basePrice), mapCatalogFields(line.product), { ...productSelections, ...line.selections }) * line.cart.qty
+    return configuredPrice(myPrices[line.product.id]?.price ?? Number(line.product.basePrice), mapCatalogFields(line.product), { ...productSelections, ...line.selections }) * line.cart.qty
   }
-  const estimatedTotal = useMemo(() => lines.reduce((sum, line) => sum + linePrice(line), 0), [lines])
-  const vat = Math.round((estimatedTotal * 5 / 105) * 100) / 100
+  const estimatedTotal = useMemo(() => lines.reduce((sum, line) => sum + linePrice(line), 0), [lines, myPrices])
+  const shopVat = useShopVat()
+  const vat = vatInside(estimatedTotal, shopVat)
   const net = Math.round((estimatedTotal - vat) * 100) / 100
   const stepIndex = STEPS.findIndex(candidate => candidate.id === step)
 
@@ -190,7 +198,9 @@ export function CheckoutDialog({ onClose }: { onClose: () => void }) {
           attachments: line.artwork.map(file => ({ token: file.token, kind: 'artwork' })),
         })),
       }, session.access_token)
-      clearCart(); navigate(`/orders/${order.id}/confirmation`, { replace: true })
+      clearCart()
+      if ('approvalRequired' in order) { alert(order.message); navigate('/account?tab=team', { replace: true }); return }
+      navigate(`/orders/${order.id}/confirmation`, { replace: true })
     } catch (err) { setError(err instanceof Error ? err.message : 'Could not place order') }
     finally { setPlacing(false) }
   }
@@ -245,7 +255,7 @@ export function CheckoutDialog({ onClose }: { onClose: () => void }) {
         {step === 'payment' && <section style={cardStyle}><h2 style={{ margin: '0 0 8px', fontSize: 18 }}>Payment Method</h2>{requiresDeposit ? <div style={{ padding: 16, border: '2px solid #1D4ED8', borderRadius: 10, background: '#EFF6FF' }}><strong style={{ fontSize: 15 }}>Pay {depositPct}% deposit now</strong><div style={{ fontSize: 13, color: '#334155', marginTop: 10, lineHeight: 1.9 }}><div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Order total</span><span>AED {estimatedTotal.toFixed(2)}</span></div><div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#1D4ED8' }}><span>Deposit due now</span><span>AED {depositDue.toFixed(2)}</span></div><div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Balance (billed later)</span><span>AED {balanceLater.toFixed(2)}</span></div></div><p style={{ fontSize: 12, color: '#64748B', margin: '12px 0 0' }}>These items are made to order and can't be shown as an on-screen proof, so we collect a {depositPct}% deposit now. Our team finalises the artwork with you over WhatsApp or email and invoices the remaining balance.</p></div> : <><p style={{ color: '#64748B', fontSize: 13, margin: '0 0 16px' }}>Online card and wallet payments will appear after a secure payment provider is connected.</p>{([{ id: 'cash_on_delivery', label: 'Cash on Delivery', help: 'Pay when your order is delivered.' }, { id: 'bank_transfer', label: 'Bank Transfer', help: 'Your order stays pending until the transfer is confirmed.' }] as const).map(method => <label key={method.id} style={{ display: 'flex', gap: 11, padding: 14, border: `2px solid ${payment === method.id ? '#1D4ED8' : '#E2E8F0'}`, borderRadius: 10, marginBottom: 10, cursor: 'pointer', background: payment === method.id ? '#EFF6FF' : '#fff' }}><input type="radio" checked={payment === method.id} onChange={() => setPayment(method.id)} /><span><strong>{method.label}</strong><small style={{ display: 'block', color: '#64748B', marginTop: 3 }}>{method.help}</small></span></label>)}</>}<div style={{ display: 'flex', gap: 9, marginTop: 18 }}><button onClick={() => setStep('delivery')} style={{ flex: 1, padding: 12, borderRadius: 9, border: '1px solid #E2E8F0', background: '#fff' }}>← Back</button><button onClick={() => setStep('review')} style={{ flex: 2, padding: 12, borderRadius: 9, border: 0, background: '#1D4ED8', color: '#fff', fontWeight: 700 }}>Review Order →</button></div></section>}
         {step === 'review' && <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}><section style={cardStyle}><h2 style={{ margin: '0 0 12px', fontSize: 16 }}>Delivery</h2><div style={{ fontSize: 14, lineHeight: 1.6 }}>{address.fullName} · {address.phone}<br />{address.line1}{address.line2 && `, ${address.line2}`}<br />{address.city}, {address.emirate}, UAE</div></section><section style={cardStyle}><h2 style={{ margin: '0 0 12px', fontSize: 16 }}>Items and specifications</h2>{lines.map(line => <div key={line.cart.id} style={{ padding: '10px 0', borderBottom: '1px solid #F1F5F9' }}><strong>{line.product.name} × {line.cart.qty}</strong>{[...(line.cart.selections ?? []), ...line.fields.map(field => ({ fieldId: field.id, value: line.selections[field.id] }))].map(selection => { const field = mapCatalogFields(line.product).find(candidate => candidate.id === selection.fieldId); return field && selection.value ? <div key={selection.fieldId} style={{ fontSize: 12, color: '#64748B', marginTop: 3 }}>{field.label}: {asValues(selection.value).map(value => field.options.find(option => option.value === value)?.label ?? value).join(', ')}</div> : null })}<div style={{ fontSize: 12, color: '#047857', marginTop: 4 }}>{line.artwork.length} artwork file{line.artwork.length === 1 ? '' : 's'} attached</div></div>)}</section><div style={{ display: 'flex', gap: 9 }}><button onClick={() => setStep('payment')} style={{ flex: 1, padding: 12, borderRadius: 9, border: '1px solid #E2E8F0', background: '#fff' }}>← Back</button><button disabled={placing} onClick={placeOrder} style={{ flex: 2, padding: 13, borderRadius: 9, border: 0, background: placing ? '#64748B' : '#1D4ED8', color: '#fff', fontWeight: 700 }}>{placing ? 'Placing order…' : requiresDeposit ? `Pay deposit · AED ${depositDue.toFixed(2)}` : `Place Order · AED ${estimatedTotal.toFixed(2)}`}</button></div></div>}
       </main>
-      <aside style={{ ...cardStyle, height: 'fit-content', position: 'sticky', top: 24 }}><h3 style={{ margin: '0 0 14px', fontSize: 16 }}>Order Summary</h3>{lines.map(line => <div key={line.cart.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 9 }}><span>{line.product.name} × {line.cart.qty}</span><strong>AED {linePrice(line).toFixed(2)}</strong></div>)}<div style={{ borderTop: '1px solid #E2E8F0', paddingTop: 11, marginTop: 10, display: 'grid', gap: 7, fontSize: 13 }}><div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Net amount</span><span>AED {net.toFixed(2)}</span></div><div style={{ display: 'flex', justifyContent: 'space-between' }}><span>VAT included (5%)</span><span>AED {vat.toFixed(2)}</span></div><div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 17, fontWeight: 800, paddingTop: 8, borderTop: '1px solid #F1F5F9' }}><span>Total</span><span>AED {estimatedTotal.toFixed(2)}</span></div></div></aside>
+      <aside style={{ ...cardStyle, height: 'fit-content', position: 'sticky', top: 24 }}><h3 style={{ margin: '0 0 14px', fontSize: 16 }}>Order Summary</h3>{lines.map(line => <div key={line.cart.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 9 }}><span>{line.product.name} × {line.cart.qty}</span><strong>AED {linePrice(line).toFixed(2)}</strong></div>)}<div style={{ borderTop: '1px solid #E2E8F0', paddingTop: 11, marginTop: 10, display: 'grid', gap: 7, fontSize: 13 }}><div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Net amount</span><span>AED {net.toFixed(2)}</span></div><div style={{ display: 'flex', justifyContent: 'space-between' }}><span>{shopVat.enabled ? `VAT included (${shopVat.ratePercent}%)` : 'No VAT'}</span><span>AED {vat.toFixed(2)}</span></div><div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 17, fontWeight: 800, paddingTop: 8, borderTop: '1px solid #F1F5F9' }}><span>Total</span><span>AED {estimatedTotal.toFixed(2)}</span></div></div></aside>
     </div>
   </div></DialogFrame>
 }

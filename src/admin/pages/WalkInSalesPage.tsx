@@ -3,6 +3,31 @@ import { useNavigate } from 'react-router-dom'
 import { AdminLayout, Btn, StatCard, StatGrid } from '../components/AdminLayout'
 import { api } from '../../lib/api'
 import { useAuth } from '../lib/AuthContext'
+import { RecordDepositModal } from '../components/CustomerHistory'
+import { printInvoiceById } from '../lib/invoicePrint'
+import { applyVat, priceFor, useCustomerPricing, useVatConfig, vatLabel, type CustomerPricing, type VatConfig } from '../lib/tax'
+
+// Net / VAT / total lines under an order's products (same maths as the server)
+function VatSummary({ lines, cfg, treatment }: { lines: number; cfg: VatConfig | null; treatment: string }) {
+  const p = applyVat(lines, cfg, treatment)
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 2, fontSize: 12, color: '#64748B', marginBottom: 6 }}>
+      <span>Net (excl. VAT)</span><span>AED {fmt(p.net)}</span>
+      <span>{vatLabel(cfg, treatment)}</span><span>AED {fmt(p.vat)}</span>
+    </div>
+  )
+}
+
+// "Freelancer rate — 10% off" badge for the chosen customer
+function RateBadge({ pricing }: { pricing: CustomerPricing | null }) {
+  if (!pricing || (!pricing.group && pricing.vatTreatment === 'standard')) return null
+  return (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+      {pricing.group && <span style={{ fontSize: 11, fontWeight: 600, background: '#ECFDF5', color: '#047857', padding: '2px 8px', borderRadius: 999 }}>{pricing.group.name} rate{pricing.group.discountPercent > 0 ? ` — ${pricing.group.discountPercent}% off` : ''} · prices pre-filled</span>}
+      {pricing.vatTreatment !== 'standard' && <span style={{ fontSize: 11, fontWeight: 600, background: '#FEF3C7', color: '#92400E', padding: '2px 8px', borderRadius: 999 }}>{pricing.vatTreatment === 'exempt' ? 'VAT exempt' : 'Zero-rated'} — no VAT</span>}
+    </div>
+  )
+}
 
 const FONT  = "'Poppins', system-ui, sans-serif"
 const DARK  = '#0F172A'
@@ -144,6 +169,76 @@ function ItemFields({ productId, selections, onChange, onModifierTotal }: { prod
 }
 
 // ── New Sale Modal ────────────────────────────────────────────────────────────
+// ── Customer deposits (credit) ────────────────────────────────────────────────
+interface OpenDeposit { id: string; depositNo: string; amount: string; remaining: number; createdAt: string; note: string | null; sourceSale: { saleNumber: string } | null }
+interface CreditInfo { available: number; open: OpenDeposit[] }
+const getCredit = (customerId: string) => api.get<CreditInfo>(`/customer-deposits/customer/${customerId}`)
+
+// Use the customer's open deposits oldest-first until `amount` is covered
+async function applyCredit(saleId: string, open: OpenDeposit[], amount: number) {
+  let left = Math.round(amount * 100) / 100
+  for (const d of open) {
+    if (left <= 0) break
+    const use = Math.min(left, d.remaining)
+    if (use <= 0) continue
+    await api.post('/customer-deposits/apply', { saleId, depositId: d.id, amount: use })
+    left = Math.round((left - use) * 100) / 100
+  }
+}
+
+function ApplyDepositModal({ sale, credit, onClose, onSaved }: { sale: Sale; credit: CreditInfo; onClose: () => void; onSaved: () => void }) {
+  const balance = Math.max(0, Number(sale.totalAmount) - Number(sale.advancePaid))
+  const [depositId, setDepositId] = useState(credit.open[0]?.id ?? '')
+  const chosen = credit.open.find(d => d.id === depositId)
+  const [amount, setAmount] = useState(String(Math.min(balance, credit.open[0]?.remaining ?? 0).toFixed(2)))
+  const [err, setErr] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const pick = (id: string) => {
+    setDepositId(id)
+    const d = credit.open.find(x => x.id === id)
+    if (d) setAmount(String(Math.min(balance, d.remaining).toFixed(2)))
+  }
+  const save = async () => {
+    const amt = parseFloat(amount)
+    if (!chosen) return setErr('Choose a deposit')
+    if (!amt || amt <= 0) return setErr('Enter an amount')
+    if (amt > chosen.remaining + 0.001) return setErr(`Only AED ${fmt(chosen.remaining)} left on ${chosen.depositNo}`)
+    if (amt > balance + 0.001) return setErr(`Balance due is only AED ${fmt(balance)}`)
+    setSaving(true)
+    try { await api.post('/customer-deposits/apply', { saleId: sale.id, depositId, amount: amt }); onSaved(); onClose() }
+    catch (e: any) { setErr(e.message ?? 'Error') }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ background: '#fff', borderRadius: 12, padding: 26, width: 440, maxWidth: '100%', fontFamily: FONT }}>
+        <h3 style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 700, color: DARK }}>Apply Deposit</h3>
+        <p style={{ margin: '0 0 14px', fontSize: 12, color: '#64748B' }}>{sale.customer.name} has AED {fmt(credit.available)} in deposits / credit from earlier. Balance due on {sale.saleNumber}: <b>AED {fmt(balance)}</b></p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+          {credit.open.map(d => (
+            <label key={d.id} style={{ display: 'flex', gap: 10, alignItems: 'center', border: `1px solid ${d.id === depositId ? BLUE : '#E2E8F0'}`, borderRadius: 8, padding: '8px 10px', cursor: 'pointer' }}>
+              <input type="radio" checked={d.id === depositId} onChange={() => pick(d.id)} />
+              <div style={{ flex: 1, fontSize: 13 }}>
+                <b>{d.depositNo}</b> <span style={{ color: '#64748B', fontSize: 12 }}>· {d.createdAt.slice(0, 10)}{d.sourceSale ? ` · from cancelled ${d.sourceSale.saleNumber}` : ''}</span>
+                {d.note && <div style={{ fontSize: 11, color: '#94A3B8' }}>{d.note}</div>}
+              </div>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#7C3AED' }}>AED {fmt(d.remaining)}</span>
+            </label>
+          ))}
+        </div>
+        <label>{lbl('Amount to apply (AED)')}<input type="number" min={0} step="0.01" value={amount} onChange={e => setAmount(e.target.value)} style={inp} /></label>
+        {err && <div style={{ color: '#EF4444', fontSize: 12, marginTop: 10 }}>{err}</div>}
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
+          <Btn label="Cancel" variant="secondary" onClick={onClose} />
+          <Btn label={saving ? 'Applying…' : 'Apply to Order'} onClick={save} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function NewSaleModal({ customers, products, onClose, onSaved }: {
   customers: Customer[]; products: Product[]; onClose: () => void; onSaved: () => void
 }) {
@@ -156,6 +251,24 @@ function NewSaleModal({ customers, products, onClose, onSaved }: {
   const [discount,   setDiscount] = useState('')
   const [err,        setErr]      = useState('')
   const [saving,     setSaving]   = useState(false)
+  const [credit,     setCredit]   = useState<CreditInfo | null>(null)
+  const [useCredit,  setUseCredit] = useState('')
+  const vatCfg  = useVatConfig()
+  const pricing = useCustomerPricing(customerId || null)
+
+  // Customer chosen / changed → their special rates fill the prices (still editable)
+  useEffect(() => {
+    if (pricing) setItems(prev => prev.map(i => {
+      const rate = priceFor(pricing, i.productId)
+      return rate ? { ...i, basePrice: rate, unitPrice: Math.round((rate + (i.unitPrice - i.basePrice)) * 100) / 100 } : i
+    }))
+  }, [pricing])
+
+  // Deposit / credit the customer already left with us (e.g. paid earlier, order confirmed by phone)
+  useEffect(() => {
+    setCredit(null); setUseCredit('')
+    if (customerId) getCredit(customerId).then(setCredit).catch(() => {})
+  }, [customerId])
 
   const { user, can } = useAuth()
   const [allowDiscount, setAllowDiscount] = useState(false)
@@ -165,31 +278,40 @@ function NewSaleModal({ customers, products, onClose, onSaved }: {
   const priceOf = (pid: string) => Number(products.find(p => p.id === pid)?.basePrice ?? 0) || 0
   const addItem = () => {
     const pid = products.find(p => !items.find(i => i.productId === p.id))?.id ?? products[0]?.id
-    if (pid) setItems(prev => [...prev, { productId: pid, quantity: 1, unitPrice: priceOf(pid), basePrice: priceOf(pid), customization: '', selections: {} }])
+    if (pid) { const rate = priceFor(pricing, pid) || priceOf(pid); setItems(prev => [...prev, { productId: pid, quantity: 1, unitPrice: rate, basePrice: rate, customization: '', selections: {} }]) }
   }
   const removeItem = (idx: number) => setItems(p => p.filter((_, i) => i !== idx))
   const setItem = (idx: number, key: string, val: any) => setItems(p => p.map((it, i) => i === idx ? { ...it, [key]: val } : it))
-  // Product changed → reset price/selections to the new product's base price.
-  const changeProduct = (idx: number, pid: string) => setItems(p => p.map((it, i) => i === idx ? { ...it, productId: pid, basePrice: priceOf(pid), unitPrice: priceOf(pid), selections: {} } : it))
+  // Product changed → reset price/selections to the new product's price (customer's special rate if they have one).
+  const changeProduct = (idx: number, pid: string) => { const rate = priceFor(pricing, pid) || priceOf(pid); setItems(p => p.map((it, i) => i === idx ? { ...it, productId: pid, basePrice: rate, unitPrice: rate, selections: {} } : it)) }
   // Selected options changed → unit price = base price + option modifiers.
   const setModifiers = (idx: number, modTotal: number) => setItems(p => p.map((it, i) => i === idx ? { ...it, unitPrice: Math.round((it.basePrice + modTotal) * 100) / 100 } : it))
 
   const subtotal = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0)
   const discountVal = Math.max(0, Math.min(subtotal, parseFloat(discount) || 0))
-  const total = Math.round((subtotal - discountVal) * 100) / 100
+  // Discount comes off the lines, then VAT is applied (same maths as the server)
+  const linesTotal = Math.round((subtotal - discountVal) * 100) / 100
+  const total = applyVat(linesTotal, vatCfg, pricing?.vatTreatment ?? 'standard').total
   const advance = parseFloat(advAmt) || 0
+  const creditUse = parseFloat(useCredit) || 0
 
   const save = async () => {
     if (!customerId) return setErr('Select a customer')
     if (!items.length) return setErr('Add at least one product')
     if (items.some(i => i.unitPrice <= 0)) return setErr('Set price for all items')
+    if (creditUse > (credit?.available ?? 0) + 0.001) return setErr(`Customer only has AED ${fmt(credit?.available ?? 0)} credit`)
+    if (advance + creditUse > total + 0.001) return setErr('Advance + deposit used cannot be more than the order total')
     setSaving(true)
     try {
       const payload = items.map(i => ({
         productId: i.productId, quantity: i.quantity, unitPrice: i.unitPrice, customization: i.customization,
         selections: Object.entries(i.selections).filter(([, v]) => v != null && v !== '' && !(Array.isArray(v) && v.length === 0)).map(([fieldId, value]) => ({ fieldId, value })),
       }))
-      await api.post('/walk-in-sales', { customerId, note, dueDate, advanceAmount: advance, advanceMethod: advMethod, discount: canDiscount ? discountVal : 0, items: payload })
+      const sale = await api.post<{ id: string }>('/walk-in-sales', { customerId, note, dueDate, advanceAmount: advance, advanceMethod: advMethod, discount: canDiscount ? discountVal : 0, items: payload })
+      if (creditUse > 0 && credit) {
+        try { await applyCredit(sale.id, credit.open, creditUse) }
+        catch (e: any) { alert(`Order created, but the deposit could not be applied: ${e.message ?? e}. Apply it from the order.`) }
+      }
       onSaved(); onClose()
     } catch (e: any) { setErr(e.message ?? 'Error') }
     finally { setSaving(false) }
@@ -210,6 +332,7 @@ function NewSaleModal({ customers, products, onClose, onSaved }: {
               <option value="">— select customer —</option>
               {customers.map(c => <option key={c.id} value={c.id}>{c.name}{c.phone ? ` · ${c.phone}` : ''}</option>)}
             </select>
+            {customerId && <RateBadge pricing={pricing} />}
           </label>
           <label>{lbl('Due Date')}<input type="date" value={dueDate} onChange={e => setDue(e.target.value)} style={inp} /></label>
           <label>{lbl('Note')}<input value={note} onChange={e => setNote(e.target.value)} placeholder="Order notes…" style={inp} /></label>
@@ -232,6 +355,9 @@ function NewSaleModal({ customers, products, onClose, onSaved }: {
                 <input type="number" min={1} value={it.quantity} onChange={e => setItem(idx, 'quantity', Number(e.target.value))} placeholder="Qty" style={inp} />
                 <input type="number" min={0} step="0.01" value={it.unitPrice || ''} onChange={e => setItem(idx, 'unitPrice', parseFloat(e.target.value) || 0)} placeholder="Price" style={inp} />
               </div>
+              {pricing?.prices[it.productId]?.special && (
+                <div style={{ fontSize: 11, color: '#047857', marginBottom: 6 }}>Special rate AED {fmt(pricing.prices[it.productId].price)} (catalogue AED {fmt(pricing.prices[it.productId].base)})</div>
+              )}
               <div style={{ display: 'flex', gap: 8 }}>
                 <input value={it.customization} onChange={e => setItem(idx, 'customization', e.target.value)} placeholder="Customization notes…" style={{ ...inp, flex: 1 }} />
                 <button onClick={() => removeItem(idx)} style={{ border: 'none', background: '#FEE2E2', color: '#DC2626', borderRadius: 8, padding: '0 12px', cursor: 'pointer', fontSize: 16 }}>×</button>
@@ -249,7 +375,19 @@ function NewSaleModal({ customers, products, onClose, onSaved }: {
               <label style={{ fontSize: 13, fontWeight: 700, color: '#92400E' }}>Discount (AED)</label>
               <input type="number" min={0} step="0.01" value={discount} onChange={e => setDiscount(e.target.value)} placeholder="0.00" style={{ ...inp, width: 140 }} />
             </div>
-            {discountVal > 0 && <div style={{ fontSize: 11, color: '#92400E', marginTop: 6 }}>Subtotal AED {fmt(subtotal)} − discount AED {fmt(discountVal)} = <strong>AED {fmt(total)}</strong></div>}
+            {discountVal > 0 && <div style={{ fontSize: 11, color: '#92400E', marginTop: 6 }}>Subtotal AED {fmt(subtotal)} − discount AED {fmt(discountVal)} = <strong>AED {fmt(linesTotal)}</strong></div>}
+          </div>
+        )}
+
+        {/* Deposit / credit from earlier */}
+        {credit && credit.available > 0 && (
+          <div style={{ background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: 10, padding: 14, marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#5B21B6', marginBottom: 6 }}>Customer has AED {fmt(credit.available)} deposit credit</div>
+            <div style={{ fontSize: 12, color: '#6D28D9', marginBottom: 8 }}>{credit.open.map(d => `${d.depositNo} (AED ${fmt(d.remaining)})`).join(' · ')}</div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input type="number" min={0} step="0.01" value={useCredit} onChange={e => setUseCredit(e.target.value)} placeholder="Amount to use" style={{ ...inp, maxWidth: 180 }} />
+              <Btn label="Use max" variant="secondary" onClick={() => setUseCredit(String(Math.min(credit.available, Math.max(0, total - advance)).toFixed(2)))} />
+            </div>
           </div>
         )}
 
@@ -271,10 +409,11 @@ function NewSaleModal({ customers, products, onClose, onSaved }: {
         </div>
 
         {/* Summary */}
+        {items.length > 0 && <div style={{ padding: '0 14px' }}><VatSummary lines={linesTotal} cfg={vatCfg} treatment={pricing?.vatTreatment ?? 'standard'} /></div>}
         {items.length > 0 && (
           <div style={{ background: '#F8FAFC', borderRadius: 10, padding: '10px 14px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
             <span style={{ color: '#64748B' }}>Total: <strong style={{ color: DARK }}>AED {fmt(total)}</strong></span>
-            <span style={{ color: '#64748B' }}>Balance: <strong style={{ color: '#EF4444' }}>AED {fmt(Math.max(0, total - advance))}</strong></span>
+            <span style={{ color: '#64748B' }}>Balance: <strong style={{ color: '#EF4444' }}>AED {fmt(Math.max(0, total - advance - creditUse))}</strong>{creditUse > 0 && <span style={{ fontSize: 11 }}> (after AED {fmt(creditUse)} deposit)</span>}</span>
           </div>
         )}
 
@@ -655,15 +794,19 @@ function EditSaleModal({ sale, products, onClose, onSaved }: {
   )
   const [err,    setErr]    = useState('')
   const [saving, setSaving] = useState(false)
+  const vatCfg  = useVatConfig()
+  const pricing = useCustomerPricing(sale.customer.id)
 
   const addItem = () => {
     const pid = products.find(p => !items.find(i => i.productId === p.id))?.id ?? products[0]?.id
-    if (pid) setItems(prev => [...prev, { productId: pid, quantity: 1, unitPrice: 0, customization: '' }])
+    if (pid) setItems(prev => [...prev, { productId: pid, quantity: 1, unitPrice: priceFor(pricing, pid), customization: '' }])
   }
   const removeItem = (idx: number) => setItems(p => p.filter((_, i) => i !== idx))
-  const setItem = (idx: number, key: string, val: any) => setItems(p => p.map((it, i) => i === idx ? { ...it, [key]: val } : it))
+  const setItem = (idx: number, key: string, val: any) => setItems(p => p.map((it, i) => i !== idx ? it
+    : key === 'productId' ? { ...it, productId: val, unitPrice: priceFor(pricing, val) } : { ...it, [key]: val }))
 
-  const newTotal = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0)
+  const newLines = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0)
+  const newTotal = applyVat(newLines, vatCfg, pricing?.vatTreatment ?? 'standard').total
 
   const save = async () => {
     if (!items.length)                          return setErr('At least one item is required')
@@ -726,6 +869,8 @@ function EditSaleModal({ sale, products, onClose, onSaved }: {
         </div>
 
         {/* Total preview */}
+        <RateBadge pricing={pricing} />
+        <div style={{ padding: '8px 14px 0' }}><VatSummary lines={newLines} cfg={vatCfg} treatment={pricing?.vatTreatment ?? 'standard'} /></div>
         <div style={{ background: '#F8FAFC', borderRadius: 10, padding: '10px 14px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
           <span style={{ color: '#64748B' }}>Previous total: <strong>AED {fmt(Number(sale.totalAmount))}</strong></span>
           <span style={{ color: DARK }}>New total: <strong style={{ color: newTotal !== Number(sale.totalAmount) ? BLUE : DARK }}>AED {fmt(newTotal)}</strong></span>
@@ -758,10 +903,20 @@ export function SaleDrawer({ saleId, suppliers, materials, products, warehouses,
   const [whPick,     setWhPick]  = useState('')
   const [whSaving,   setWhSaving]= useState(false)
   const [whError,    setWhError] = useState('')
+  const [credit,     setCredit]  = useState<CreditInfo | null>(null)
+  const [invoice,    setInvoice] = useState<{ id: string; invoiceNumber: string; status: string } | null>(null)
+  const [movable,    setMovable] = useState(0)
+  const [showApply,  setShowApply] = useState(false)
+  const [busyExtra,  setBusyExtra] = useState(false)
 
   const load = useCallback(async () => {
     const s = await api.get<Sale>(`/walk-in-sales/${saleId}`)
     setSale(s)
+    // Deposit credit, invoice and (for cancelled orders) money that can be kept as credit
+    getCredit(s.customer.id).then(setCredit).catch(() => setCredit(null))
+    api.get<{ id: string; invoiceNumber: string; status: string } | null>(`/sales-invoices/for/walk_in/${saleId}`).then(setInvoice).catch(() => setInvoice(null))
+    if (s.status === 'cancelled') api.get<{ movable: number }>(`/customer-deposits/from-sale/${saleId}`).then(r => setMovable(r.movable)).catch(() => setMovable(0))
+    else setMovable(0)
   }, [saleId])
 
   // Reload the drawer AND notify the parent list so the outer page stays in sync
@@ -888,6 +1043,21 @@ export function SaleDrawer({ saleId, suppliers, materials, products, warehouses,
     await api.patch(`/walk-in-sales/${saleId}/status`, { status: 'cancelled' })
     await load(); onUpdated()
   }
+  const issueInvoice = async () => {
+    setBusyExtra(true)
+    try { await api.post('/sales-invoices/issue', { source: 'walk_in', sourceId: saleId }); await load() }
+    catch (e: any) { alert(e.message ?? 'Error') }
+    finally { setBusyExtra(false) }
+  }
+  const keepAsCredit = async () => {
+    if (!confirm(`Keep AED ${fmt(movable)} collected on this cancelled order as ${sale.customer.name}'s credit?\nIt can then be applied to their next order.`)) return
+    setBusyExtra(true)
+    try { await api.post(`/customer-deposits/from-sale/${saleId}`, {}); await load(); onUpdated() }
+    catch (e: any) { alert(e.message ?? 'Error') }
+    finally { setBusyExtra(false) }
+  }
+  const canInvoice = ['confirmed', 'in_production', 'ready_for_pickup', 'completed'].includes(sale.status)
+  const canApply   = !!credit && credit.available > 0 && balance > 0 && !['completed', 'cancelled'].includes(sale.status)
 
   return (
     <>
@@ -971,6 +1141,35 @@ export function SaleDrawer({ saleId, suppliers, materials, products, warehouses,
             </div>
           ))}
         </div>
+
+        {/* Deposit credit · tax invoice · cancelled-order credit */}
+        {(canApply || invoice || canInvoice || (movable > 0 && can('feature.refunds'))) && (
+          <div style={{ padding: '8px 20px', borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 12 }}>
+            {canApply && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#5B21B6' }}>
+                Credit: <b>AED {fmt(credit!.available)}</b>
+                <button onClick={() => setShowApply(true)} style={{ border: '1px solid #DDD6FE', background: '#F5F3FF', color: '#5B21B6', borderRadius: 8, padding: '4px 12px', fontSize: 12, fontWeight: 600, fontFamily: FONT, cursor: 'pointer' }}>Apply deposit</button>
+              </span>
+            )}
+            {movable > 0 && can('feature.refunds') && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#92400E' }}>
+                AED {fmt(movable)} was collected on this cancelled order
+                <button disabled={busyExtra} onClick={keepAsCredit} style={{ border: '1px solid #FDE68A', background: '#FFFBEB', color: '#92400E', borderRadius: 8, padding: '4px 12px', fontSize: 12, fontWeight: 600, fontFamily: FONT, cursor: 'pointer' }}>Keep as customer credit</button>
+              </span>
+            )}
+            <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+              {invoice ? (
+                <>
+                  <span style={{ color: '#64748B' }}>Tax invoice <b style={{ color: DARK }}>{invoice.invoiceNumber}</b>{invoice.status === 'cancelled' ? ' (cancelled)' : ''}</span>
+                  <button onClick={() => printInvoiceById(invoice.id)} style={{ border: '1px solid #E2E8F0', background: '#fff', borderRadius: 8, padding: '4px 12px', fontSize: 12, fontWeight: 600, fontFamily: FONT, cursor: 'pointer' }}>Print</button>
+                </>
+              ) : canInvoice && (
+                <button disabled={busyExtra} onClick={issueInvoice} title="Issued automatically when the order is completed — issue now if the customer needs it earlier"
+                  style={{ border: '1px solid #BFDBFE', background: '#EFF6FF', color: '#1D4ED8', borderRadius: 8, padding: '4px 12px', fontSize: 12, fontWeight: 600, fontFamily: FONT, cursor: 'pointer' }}>Issue invoice</button>
+              )}
+            </span>
+          </div>
+        )}
 
         {/* Status actions */}
         {sale.status !== 'completed' && sale.status !== 'cancelled' && (
@@ -1136,6 +1335,7 @@ export function SaleDrawer({ saleId, suppliers, materials, products, warehouses,
       </div>
 
       {showPay  && <PaymentModal  sale={sale} onClose={() => setShowPay(false)}  onSaved={() => { load(); onUpdated() }} />}
+      {showApply && credit && <ApplyDepositModal sale={sale} credit={credit} onClose={() => setShowApply(false)} onSaved={() => { load(); onUpdated() }} />}
       {showEdit && <EditSaleModal sale={sale} products={products} onClose={() => setEdit(false)} onSaved={() => { load(); onUpdated() }} />}
     </>
   )
@@ -1161,6 +1361,7 @@ export function WalkInSalesPage() {
   const [custFilter,setCustF]    = useState('')
 
   const [showNew,  setNew]       = useState(false)
+  const [showDeposit, setShowDeposit] = useState(false)
   const [editSale, setEditSale]  = useState<Sale | null>(null)
   const openHandling = (id: string) => navigate(`/admin/order-handling?order=${id}`)
   const openSummary  = (id: string) => navigate(`/admin/order-summary?order=${id}`)
@@ -1211,7 +1412,7 @@ export function WalkInSalesPage() {
   return (
     <AdminLayout
       title="Walk-in Sales"
-      actions={<Btn label="+ New Sale" onClick={() => setNew(true)} />}
+      actions={<div style={{ display: 'flex', gap: 8 }}><Btn label="+ Record Deposit" variant="secondary" onClick={() => setShowDeposit(true)} /><Btn label="+ New Sale" onClick={() => setNew(true)} /></div>}
     >
       <StatGrid>
         <StatCard label="Sales (this view)"  value={String(total)}                 sub="Matching filters" />
@@ -1322,6 +1523,7 @@ export function WalkInSalesPage() {
         </div>
       )}
 
+      {showDeposit && <RecordDepositModal onClose={() => setShowDeposit(false)} onSaved={() => api.get<{ data: Customer[] }>('/walk-in-customers?pageSize=500').then(r => setCustomers(r.data))} />}
       {showNew && (
         <NewSaleModal customers={customers} products={products} onClose={() => setNew(false)} onSaved={() => { setNew(false); load() }} />
       )}

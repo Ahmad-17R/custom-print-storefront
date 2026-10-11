@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { api, posVerify } from '../../lib/api'
 import { useAuth } from '../lib/AuthContext'
+import { applyVat, priceFor, useCustomerPricing, useVatConfig, vatLabel } from '../lib/tax'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
@@ -204,6 +205,10 @@ export function PosTerminalPage() {
   const [search,      setSearch]    = useState('')
   const [catFilter,   setCat]       = useState('')
   const [customerName, setCust]     = useState('')
+  const [customerId,  setCustId]    = useState('')
+  const [customers,   setCustomers] = useState<{ id: string; name: string; phone: string | null }[]>([])
+  const vatCfg  = useVatConfig()
+  const pricing = useCustomerPricing(customerId || null)
   const [payMethod,   setPay]       = useState('cash')
   const [paidAmount,  setPaid]      = useState('')
   const [discountStr, setDiscountStr] = useState('')
@@ -215,7 +220,14 @@ export function PosTerminalPage() {
 
   useEffect(() => {
     api.get<{ data: Product[] }>('/products?pageSize=500&isActive=true&include=category').then(r => setProducts(r.data))
+    api.get<{ data: { id: string; name: string; phone: string | null }[] }>('/walk-in-customers?pageSize=200').then(r => setCustomers(r.data)).catch(() => {})
   }, [])
+
+  // Registered customer picked → their special rates fill the cart prices (still editable)
+  useEffect(() => {
+    if (!pricing) return
+    setCart(prev => prev.map(c => { const pr = priceFor(pricing, c.productId); return pr ? { ...c, unitPrice: pr, priceStr: String(pr) } : c }))
+  }, [pricing])
 
   const loadSessionOrders = useCallback(async (sid: string) => {
     const r = await api.get<{ data: any[] }>(`/pos/orders?sessionId=${sid}&pageSize=200`)
@@ -226,7 +238,8 @@ export function PosTerminalPage() {
     setCart(prev => {
       const ex = prev.find(c => c.productId === p.id)
       if (ex) return prev.map(c => c.productId === p.id ? { ...c, quantity: c.quantity + 1 } : c)
-      return [...prev, { productId: p.id, name: p.name, quantity: 1, unitPrice: 0, priceStr: '' }]
+      const pr = priceFor(pricing, p.id)
+      return [...prev, { productId: p.id, name: p.name, quantity: 1, unitPrice: pr, priceStr: pr ? String(pr) : '' }]
     })
   }
 
@@ -236,7 +249,9 @@ export function PosTerminalPage() {
 
   const discount = parseFloat(discountStr) || 0
   const subtotal = cart.reduce((s, i) => s + i.quantity * i.unitPrice, 0)
-  const total    = Math.max(0, subtotal - discount)
+  const treatment = pricing?.vatTreatment ?? 'standard'
+  const priced   = applyVat(Math.max(0, subtotal - discount), vatCfg, treatment)
+  const total    = priced.total
   const paid     = parseFloat(paidAmount) || total
   const change   = Math.max(0, paid - total)
 
@@ -247,12 +262,12 @@ export function PosTerminalPage() {
     setProc(true)
     try {
       const order = await api.post<any>('/pos/orders', {
-        sessionId: session.id, customerName: customerName || undefined,
+        sessionId: session.id, customerName: customerName || undefined, customerId: customerId || undefined,
         paymentMethod: payMethod, paidAmount: paid, discount,
         items: cart.map(i => ({ productId: i.productId, quantity: i.quantity, unitPrice: i.unitPrice })),
       })
       setReceipt(order)
-      setCart([]); setDiscountStr(''); setPaid(''); setCust(''); setPay('cash')
+      setCart([]); setDiscountStr(''); setPaid(''); setCust(''); setCustId(''); setPay('cash')
       loadSessionOrders(session.id)
     } finally { setProc(false) }
   }
@@ -357,8 +372,14 @@ export function PosTerminalPage() {
         {/* Cart header */}
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #F1F5F9' }}>
           <div style={{ fontWeight: 700, fontSize: 15, color: DARK, marginBottom: 10 }}>Cart {cart.length > 0 && `(${cart.length})`}</div>
-          <input value={customerName} onChange={e => setCust(e.target.value)} placeholder="Customer name (optional)"
-            style={{ width: '100%', padding: '7px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 12, fontFamily: FONT, outline: 'none', boxSizing: 'border-box' }} />
+          <select value={customerId} onChange={e => { setCustId(e.target.value); setCust(customers.find(c => c.id === e.target.value)?.name ?? '') }}
+            style={{ width: '100%', padding: '7px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 12, fontFamily: FONT, outline: 'none', boxSizing: 'border-box', marginBottom: 6 }}>
+            <option value="">Walk-in (no account)</option>
+            {customers.map(c => <option key={c.id} value={c.id}>{c.name}{c.phone ? ` · ${c.phone}` : ''}</option>)}
+          </select>
+          {!customerId && <input value={customerName} onChange={e => setCust(e.target.value)} placeholder="Customer name (optional)"
+            style={{ width: '100%', padding: '7px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 12, fontFamily: FONT, outline: 'none', boxSizing: 'border-box' }} />}
+          {pricing?.group && <div style={{ fontSize: 11, color: '#047857', marginTop: 4 }}>{pricing.group.name} rates{pricing.group.discountPercent > 0 ? ` — ${pricing.group.discountPercent}% off` : ''}</div>}
         </div>
 
         {/* Cart items */}
@@ -413,6 +434,9 @@ export function PosTerminalPage() {
                 <span>Discount</span><span>− AED {fmt(discount)}</span>
               </div>
             )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#64748B', marginBottom: 4 }}>
+              <span>{vatLabel(vatCfg, treatment)}</span><span>AED {fmt(priced.vat)}</span>
+            </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 18, color: DARK }}>
               <span>Total</span><span>AED {fmt(total)}</span>
             </div>

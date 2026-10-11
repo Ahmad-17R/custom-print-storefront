@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAdminCountry } from '../context/AdminCountryContext'
 import { useAuth } from '../lib/AuthContext'
 import { AccountSettingsModal } from './AccountSettingsModal'
-import type { AuthEmployee } from '../../lib/api'
+import { api, type AuthEmployee } from '../../lib/api'
 
 const pageKey = (href: string) => href.replace('/admin/', '')
 
@@ -109,6 +109,8 @@ const NAV_GROUPS = [
     id: 'sales', label: 'Sales & CRM', icon: 'sales',
     items: [
       { label: 'Customers',     href: '/admin/walk-in-customers' },
+      { label: 'Customer Types', href: '/admin/customer-groups' },
+      { label: 'Quotations',    href: '/admin/quotations' },
       { label: 'Walk-in Sales', href: '/admin/walk-in-sales' },
       { label: 'Order Handling', href: '/admin/order-handling' },
       { label: 'Order Summary', href: '/admin/order-summary' },
@@ -392,6 +394,91 @@ function CountrySwitcher() {
   )
 }
 
+// ── Alert bell: the logged-in admin's alerts (new orders, overdue POs, low stock…) ──
+interface Alert { id: string; title: string; body: string; type: 'info' | 'warning' | 'success' | 'error'; isRead: boolean; link: string | null; createdAt: string }
+const ALERT_COLOR: Record<Alert['type'], string> = { info: '#3B82F6', warning: '#F59E0B', success: '#10B981', error: '#EF4444' }
+
+function timeAgo(iso: string) {
+  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  return h < 24 ? `${h}h ago` : `${Math.floor(h / 24)}d ago`
+}
+
+function AlertBell() {
+  const navigate = useNavigate()
+  const [open, setOpen]     = useState(false)
+  const [alerts, setAlerts] = useState<Alert[]>([])
+  const [unread, setUnread] = useState(0)
+  const ref = useRef<HTMLDivElement>(null)
+
+  const load = () => api.get<{ data: Alert[]; unreadCount: number }>('/alerts?pageSize=15')
+    .then(r => { setAlerts(r.data); setUnread(r.unreadCount) })
+    .catch(() => {})
+
+  useEffect(() => {
+    load()
+    const t = setInterval(load, 60000)
+    return () => clearInterval(t)
+  }, [])
+
+  useEffect(() => {
+    if (!open) return
+    const close = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [open])
+
+  const openAlert = async (a: Alert) => {
+    if (!a.isRead) { await api.post(`/alerts/${a.id}/read`, {}).catch(() => {}); load() }
+    setOpen(false)
+    if (a.link) navigate(a.link)
+  }
+  const readAll = async () => { await api.post('/alerts/read-all', {}).catch(() => {}); load() }
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'flex' }}>
+      <button onClick={() => { setOpen(o => !o); if (!open) load() }} title="Alerts"
+        style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748B', display: 'flex', position: 'relative', padding: 2 }}>
+        {IC.bell}
+        {unread > 0 && (
+          <span style={{ position: 'absolute', top: -4, right: -6, background: '#EF4444', color: '#fff', borderRadius: 999, fontSize: 10, fontWeight: 700, minWidth: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', fontFamily: font }}>
+            {unread > 99 ? '99+' : unread}
+          </span>
+        )}
+      </button>
+      {open && (
+        <div style={{ position: 'absolute', right: 0, top: 34, width: 360, maxWidth: 'calc(100vw - 24px)', background: '#fff', border: '1px solid #E2E8F0', borderRadius: 12, boxShadow: '0 12px 32px rgba(15,23,42,0.16)', zIndex: 2000, fontFamily: font, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', borderBottom: '1px solid #F1F5F9' }}>
+            <span style={{ fontWeight: 700, fontSize: 14, color: DARK }}>Alerts {unread > 0 && <span style={{ color: '#EF4444' }}>({unread})</span>}</span>
+            {unread > 0 && <button onClick={readAll} style={{ border: 'none', background: 'none', color: BLUE, fontSize: 12, cursor: 'pointer', fontFamily: font }}>Mark all read</button>}
+          </div>
+          <div style={{ maxHeight: 380, overflowY: 'auto' }}>
+            {alerts.length === 0
+              ? <div style={{ padding: 28, textAlign: 'center', color: '#94A3B8', fontSize: 13 }}>No alerts</div>
+              : alerts.map(a => (
+                <div key={a.id} onClick={() => openAlert(a)}
+                  style={{ display: 'flex', gap: 10, padding: '10px 14px', borderBottom: '1px solid #F8FAFC', cursor: 'pointer', background: a.isRead ? '#fff' : '#F8FAFF' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: ALERT_COLOR[a.type], marginTop: 6, flexShrink: 0, opacity: a.isRead ? 0.35 : 1 }} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: a.isRead ? 500 : 700, color: DARK }}>{a.title}</div>
+                    <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>{a.body}</div>
+                    <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 3 }}>{timeAgo(a.createdAt)}</div>
+                  </div>
+                </div>
+              ))}
+          </div>
+          <button onClick={() => { setOpen(false); navigate('/admin/notifications') }}
+            style={{ width: '100%', border: 'none', borderTop: '1px solid #F1F5F9', background: '#F8FAFC', padding: '10px', fontSize: 12, fontWeight: 600, color: DARK, cursor: 'pointer', fontFamily: font }}>
+            View all alerts
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function TopBar({ title, actions, onMenuClick }: { title: string; actions?: React.ReactNode; onMenuClick?: () => void }) {
   const navigate = useNavigate()
   const isMobile = useIsMobile()
@@ -408,9 +495,7 @@ function TopBar({ title, actions, onMenuClick }: { title: string; actions?: Reac
       <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12, flexShrink: 0 }}>
         {!isMobile && actions}
         <CountrySwitcher />
-        <button style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748B', display: 'flex' }}>
-          {IC.bell}
-        </button>
+        <AlertBell />
         <div
           onClick={() => navigate('/admin')}
           style={{ width: 32, height: 32, borderRadius: '50%', background: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff', flexShrink: 0 }}>

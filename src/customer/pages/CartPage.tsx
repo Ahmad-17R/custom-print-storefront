@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useCart } from '../../context/CartContext'
 import { CATALOG_PRODUCTS } from './CatalogPage'
 import { CheckoutDialog } from './CheckoutPage'
+import { useShopVat, vatInside } from '../../lib/shopVat'
 
 export function CartPage() {
   const { items, removeItem, updateQty, total, addItem } = useCart()
@@ -11,7 +12,8 @@ export function CartPage() {
   const [checkoutOpen, setCheckoutOpen] = useState(new URLSearchParams(location.search).get('checkout') === '1')
   const closeCheckout = () => { setCheckoutOpen(false); navigate('/cart', { replace: true }) }
 
-  const vat = Math.round((total * 5 / 105) * 100) / 100
+  const shopVat = useShopVat()
+  const vat = vatInside(total, shopVat)
   const net = Math.round((total - vat) * 100) / 100
   const grandTotal = total
 
@@ -127,7 +129,7 @@ export function CartPage() {
                 <span style={{ fontWeight: 600 }}>AED {net.toFixed(2)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontFamily: 'system-ui' }}>
-                <span style={{ color: '#64748B' }}>VAT included (5%)</span>
+                <span style={{ color: '#64748B' }}>{shopVat.enabled ? `VAT included (${shopVat.ratePercent}%)` : 'No VAT'}</span>
                 <span style={{ fontWeight: 600 }}>AED {vat.toFixed(2)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontFamily: 'system-ui' }}>

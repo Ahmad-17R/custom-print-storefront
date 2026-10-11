@@ -101,6 +101,7 @@ import { AuditTrailPage }      from './admin/pages/AuditTrailPage'
 import { WebhooksPage }        from './admin/pages/WebhooksPage'
 import { EmailTemplatesPage }  from './admin/pages/EmailTemplatesPage'
 import { NotificationsPage }   from './admin/pages/NotificationsPage'
+import { CustomerGroupsPage }  from './admin/pages/CustomerGroupsPage'
 import { ShiftsPage }          from './admin/pages/ShiftsPage'
 import { HolidaysPage }        from './admin/pages/HolidaysPage'
 import { DeductionRulesPage }  from './admin/pages/DeductionRulesPage'
@@ -213,6 +214,7 @@ function Layout() {
                 <Route path="purchase-returns"          element={<PurchaseReturnsPage />} />
                 <Route path="procurement-analytics"    element={<ProcurementAnalyticsPage />} />
                 <Route path="walk-in-customers"       element={<WalkInCustomersPage />} />
+                <Route path="customer-groups"         element={<CustomerGroupsPage />} />
                 <Route path="walk-in-sales"           element={<WalkInSalesPage />} />
                 <Route path="order-handling"          element={<OrderHandlingPage />} />
                 <Route path="order-summary"           element={<OrderSummaryPage />} />

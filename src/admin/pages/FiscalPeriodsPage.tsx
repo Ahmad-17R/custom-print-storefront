@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AdminLayout, Table, SearchInput, Badge, StatCard, StatGrid, Btn } from '../components/AdminLayout'
 import { api } from '../../lib/api'
+import { monthStart, monthEnd } from '../lib/date'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
@@ -17,8 +18,8 @@ interface FiscalPeriod {
 function Modal({ item, countries, onClose, onSaved }: { item: Partial<FiscalPeriod> | null; countries: Country[]; onClose: () => void; onSaved: () => void }) {
   const [countryId, setCountry] = useState(item?.country?.id ?? countries[0]?.id ?? '')
   const [name, setName]         = useState(item?.name ?? '')
-  const [startDate, setStart]   = useState(item?.startDate ? item.startDate.slice(0, 10) : '')
-  const [endDate, setEnd]       = useState(item?.endDate ? item.endDate.slice(0, 10) : '')
+  const [startDate, setStart]   = useState(item?.startDate ? item.startDate.slice(0, 10) : (item?.id ? '' : monthStart()))
+  const [endDate, setEnd]       = useState(item?.endDate ? item.endDate.slice(0, 10) : (item?.id ? '' : monthEnd()))
   const [saving, setSaving]     = useState(false)
   const [err, setErr]           = useState('')
 

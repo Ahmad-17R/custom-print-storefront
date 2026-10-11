@@ -23,6 +23,8 @@ export const PAGE_RIGHTS: RightGroup[] = [
   ]},
   { section: 'Sales & CRM', items: [
     { key: 'walk-in-customers', label: 'Customers' },
+    { key: 'customer-groups', label: 'Customer Types & Special Rates' },
+    { key: 'quotations', label: 'Quotations' },
     { key: 'walk-in-sales', label: 'Walk-in Sales' },
     { key: 'order-handling', label: 'Order Handling (Walk-in)' },
     { key: 'order-summary', label: 'Order Summary' },
@@ -87,6 +89,7 @@ export const PAGE_RIGHTS: RightGroup[] = [
   { section: 'System', items: [
     { key: 'users', label: 'Users & Roles' },
     { key: 'audit', label: 'Audit Trail' },
+    { key: 'notifications', label: 'Alerts & Notifications' },
     { key: 'settings', label: 'Company Settings' },
   ]},
 ]
@@ -102,6 +105,8 @@ export const FEATURE_RIGHTS: RightItem[] = [
   { key: 'feature.edit_confirmed',  label: 'Can edit an order after it is confirmed' },
   { key: 'feature.edit_shipment',   label: 'Can edit a shipment after it is created (carrier, route, tracking, status)' },
   { key: 'feature.delete',          label: 'Can delete / void records' },
+  { key: 'feature.default_warehouse', label: 'Can turn the default warehouse on / off' },
+  { key: 'feature.purchase_returns',  label: 'Can return goods from purchase orders' },
 ]
 
 export const ALL_PAGE_KEYS = PAGE_RIGHTS.flatMap(g => g.items.map(i => i.key))

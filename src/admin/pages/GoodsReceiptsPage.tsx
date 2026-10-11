@@ -8,6 +8,7 @@ interface Material { id: string; name: string; unit: string }
 interface GRItem { quantity: number; material: Material }
 interface GR {
   id: string; poId: string; receivedDate: string; note: string | null
+  supplierInvoiceNo: string | null; supplierInvoiceDate: string | null
   po: { poNumber: string; supplier: { id: string; name: string } }
   warehouse: { id: string; name: string }
   items: GRItem[]
@@ -28,13 +29,17 @@ export function GoodsReceiptsPage() {
   const filtered = data.filter(r =>
     r.po.poNumber.toLowerCase().includes(q.toLowerCase()) ||
     r.po.supplier.name.toLowerCase().includes(q.toLowerCase()) ||
-    r.warehouse.name.toLowerCase().includes(q.toLowerCase())
+    r.warehouse.name.toLowerCase().includes(q.toLowerCase()) ||
+    (r.supplierInvoiceNo ?? '').toLowerCase().includes(q.toLowerCase())
   )
 
   const rows = filtered.map(r => ({
     grId:      <code style={{ fontSize: 12 }}>{r.id.slice(0, 8).toUpperCase()}</code>,
     poNumber:  r.po.poNumber,
     supplier:  r.po.supplier.name,
+    invoice:   r.supplierInvoiceNo
+      ? <div><div style={{ fontWeight: 600 }}>{r.supplierInvoiceNo}</div>{r.supplierInvoiceDate && <div style={{ fontSize: 11, color: '#64748B' }}>{r.supplierInvoiceDate.slice(0, 10)}</div>}</div>
+      : <span style={{ color: '#F59E0B', fontSize: 12 }}>missing</span>,
     warehouse: r.warehouse.name,
     materials: r.items.map(i => `${i.material.name} (${i.quantity} ${i.material.unit})`).join(', '),
     date:      r.receivedDate.slice(0, 10),
@@ -45,6 +50,7 @@ export function GoodsReceiptsPage() {
     { key: 'grId',      label: 'GR #',      width: 100 },
     { key: 'poNumber',  label: 'PO #',      width: 130 },
     { key: 'supplier',  label: 'Supplier',  width: 150 },
+    { key: 'invoice',   label: 'Supplier Invoice', width: 140 },
     { key: 'warehouse', label: 'Warehouse', width: 140 },
     { key: 'materials', label: 'Materials Received' },
     { key: 'date',      label: 'Date',      width: 100 },
@@ -54,7 +60,7 @@ export function GoodsReceiptsPage() {
   const totalQty = data.reduce((s, r) => s + r.items.reduce((ss, i) => ss + i.quantity, 0), 0)
 
   return (
-    <AdminLayout title="Goods Receipts" actions={<SearchInput value={q} onChange={setQ} placeholder="Search PO, supplier, warehouse…" />}>
+    <AdminLayout title="Goods Receipts" actions={<SearchInput value={q} onChange={setQ} placeholder="Search PO, supplier, invoice no…" />}>
       <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 10, padding: '12px 16px', marginBottom: 20, fontSize: 13, color: '#14532D', fontFamily: FONT }}>
         Goods receipts are created automatically when you click <strong>Receive</strong> on a confirmed Purchase Order. Each receipt updates stock levels immediately.
       </div>

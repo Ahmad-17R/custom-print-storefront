@@ -1,14 +1,27 @@
 import React, { useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AdminLayout, Table, Btn, SearchInput, Badge, StatCard, StatGrid } from '../components/AdminLayout'
 import { api } from '../../lib/api'
+import { useAuth } from '../lib/AuthContext'
+import { today } from '../lib/date'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
 
 type POStatus = 'draft' | 'confirmed' | 'partially_received' | 'fully_received' | 'closed' | 'cancelled'
 interface Material  { id: string; name: string; unit: string }
-interface Supplier  { id: string; name: string }
-interface Warehouse { id: string; name: string }
+interface Supplier  { id: string; name: string; trn?: string | null; corporateTaxNo?: string | null }
+interface Warehouse { id: string; name: string; isDefault?: boolean; isActive?: boolean }
+interface ApprovedReq {
+  id: string; status: string; note: string | null; requestedBy: string; neededBy?: string | null; createdAt?: string
+  _count?: { items: number }; purchaseOrders?: { id: string; poNumber: string; status: string }[]; toOrder?: boolean
+}
+interface ReqDetail {
+  id: string; status: string; note: string | null
+  items: { id: string; materialId: string; quantity: number; material: Material | null }[]
+  ordered: { itemId: string; materialId: string; requested: number; ordered: number; remaining: number }[]
+}
+const prNo = (id: string) => `PR-${id.slice(0, 8).toUpperCase()}`
 interface POItem {
   id: string; materialId: string; quantity: number; unitPrice: number; receivedQty: number
   material: Material
@@ -18,6 +31,9 @@ interface PO {
   orderDate: string; expectedDate: string | null; note: string | null; createdAt: string
   supplier: Supplier
   items: POItem[]
+  requisitionId?: string | null
+  requisition?: { id: string; status?: string; requestedBy?: string } | null
+  receipts?: { id: string; receivedDate: string; supplierInvoiceNo: string | null; supplierInvoiceDate: string | null; warehouse: { name: string } }[]
   _count: { items: number; receipts: number }
 }
 
@@ -35,8 +51,8 @@ const inp: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '
 const lbl = (t: string) => <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 4 }}>{t}</span>
 
 // ── New PO Modal ───────────────────────────────────────────────────────────
-function NewPOModal({ suppliers, materials, onClose, onSave }: {
-  suppliers: Supplier[]; materials: Material[]; onClose: () => void; onSave: () => void
+function NewPOModal({ suppliers, materials, requisitions, initialReqId, onClose, onSave }: {
+  suppliers: Supplier[]; materials: Material[]; requisitions: ApprovedReq[]; initialReqId?: string | null; onClose: () => void; onSave: () => void
 }) {
   const [supplierId,   setSupplier]  = useState(suppliers[0]?.id ?? '')
   const [expectedDate, setExpected]  = useState('')
@@ -44,12 +60,29 @@ function NewPOModal({ suppliers, materials, onClose, onSave }: {
   const [lines, setLines] = useState([{ materialId: '', quantity: 1, unitPrice: '' }])
   const [loading, setLoad] = useState(false)
   const [err, setErr] = useState('')
+  const [reqId, setReqId] = useState(initialReqId ?? '')
+  const [req,   setReq]   = useState<ReqDetail | null>(null)
+
+  // Raising the PO against an approved requisition: lines = what is still left to order
+  useEffect(() => {
+    if (!reqId) { setReq(null); return }
+    api.get<ReqDetail>(`/purchase-requisitions/${reqId}`).then(r => {
+      setReq(r)
+      const left = r.ordered.filter(o => o.remaining > 0)
+      setLines(left.length ? left.map(o => ({ materialId: o.materialId, quantity: o.remaining, unitPrice: '' })) : [{ materialId: '', quantity: 1, unitPrice: '' }])
+      if (r.note && !note) setNote(`For ${prNo(r.id)} — ${r.note}`)
+      if (!r.items.length) setErr('')
+    }).catch(e => setErr(e.message))
+  }, [reqId])
+  const remainingFor = (materialId: string) => req?.ordered.find(o => o.materialId === materialId)?.remaining
+  // Request with material lines → only those; description-only request ("2 boxes of A4…") → any material
+  const pickable = req && req.items.length ? materials.filter(m => req.ordered.some(o => o.materialId === m.id && o.remaining > 0)) : materials
 
   const setLine = (i: number, field: string, val: string | number) =>
     setLines(prev => prev.map((l, idx) => idx === i ? { ...l, [field]: val } : l))
 
   const usedIds = lines.map(l => l.materialId).filter(Boolean)
-  const availFor = (idx: number) => materials.filter(m => !usedIds.includes(m.id) || lines[idx].materialId === m.id)
+  const availFor = (idx: number) => pickable.filter(m => !usedIds.includes(m.id) || lines[idx].materialId === m.id)
 
   const total = lines.reduce((s, l) => s + (l.quantity || 0) * (Number(l.unitPrice) || 0), 0)
 
@@ -57,10 +90,15 @@ function NewPOModal({ suppliers, materials, onClose, onSave }: {
     if (!supplierId) return setErr('Select a supplier')
     const valid = lines.filter(l => l.materialId && l.quantity > 0 && Number(l.unitPrice) > 0)
     if (!valid.length) return setErr('Add at least one item with material, qty and price')
+    for (const l of valid) {
+      const left = remainingFor(l.materialId)
+      if (req && left !== undefined && l.quantity > left) return setErr(`${materials.find(m => m.id === l.materialId)?.name}: only ${left} left to order on ${prNo(req.id)}`)
+    }
     setLoad(true)
     try {
       await api.post('/purchase-orders', {
         supplierId,
+        requisitionId: reqId || undefined,
         expectedDate: expectedDate || undefined,
         note: note || undefined,
         items: valid.map(l => ({ materialId: l.materialId, quantity: l.quantity, unitPrice: Number(l.unitPrice) })),
@@ -77,6 +115,14 @@ function NewPOModal({ suppliers, materials, onClose, onSave }: {
         <p style={{ margin: '0 0 20px', fontSize: 13, color: '#64748B' }}>Create a direct PO to a supplier. You can also convert a quoted RFQ to a PO from the RFQs page.</p>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+          <label style={{ gridColumn: '1/-1' }}>
+            {lbl('From requisition (optional)')}
+            <select value={reqId} onChange={e => setReqId(e.target.value)} style={inp}>
+              <option value="">— none (direct PO) —</option>
+              {requisitions.map(r => <option key={r.id} value={r.id}>{prNo(r.id)} · {r.requestedBy}{r.note ? ` · ${r.note}` : ''}</option>)}
+            </select>
+            {req && <span style={{ fontSize: 11, color: '#1D4ED8', marginTop: 4, display: 'block' }}>Lines are limited to the materials and quantities still left to order on {prNo(req.id)}.</span>}
+          </label>
           <label style={{ gridColumn: '1/-1' }}>
             {lbl('Supplier *')}
             <select value={supplierId} onChange={e => setSupplier(e.target.value)} style={inp}>
@@ -107,12 +153,12 @@ function NewPOModal({ suppliers, materials, onClose, onSave }: {
                   <option value="">— select —</option>
                   {availFor(i).map(m => <option key={m.id} value={m.id}>{m.name} ({m.unit})</option>)}
                 </select>
-                <input type="number" min={1} value={line.quantity} onChange={e => setLine(i, 'quantity', Number(e.target.value))} style={inp} />
+                <input type="number" min={1} max={remainingFor(line.materialId)} value={line.quantity} onChange={e => setLine(i, 'quantity', Number(e.target.value))} style={inp} title={remainingFor(line.materialId) !== undefined ? `${remainingFor(line.materialId)} left on requisition` : undefined} />
                 <input type="number" min={0} step="0.01" value={line.unitPrice} onChange={e => setLine(i, 'unitPrice', e.target.value)} placeholder="0.00" style={inp} />
                 <button onClick={() => setLines(prev => prev.filter((_, idx) => idx !== i))} style={{ border: 'none', background: 'transparent', color: '#EF4444', fontSize: 18, cursor: 'pointer', padding: 0 }}>×</button>
               </div>
             ))}
-            {lines.length < materials.length && (
+            {lines.length < pickable.length && (
               <button onClick={() => setLines(prev => [...prev, { materialId: '', quantity: 1, unitPrice: '' }])}
                 style={{ marginTop: 4, background: 'none', border: '1px dashed #CBD5E1', borderRadius: 6, padding: '6px 14px', cursor: 'pointer', fontSize: 12, color: '#64748B', fontFamily: FONT }}>
                 + Add Line
@@ -144,14 +190,18 @@ function ReceiveModal({ po, warehouses, onClose, onSave }: {
   po: PO; warehouses: Warehouse[]; onClose: () => void; onSave: () => void
 }) {
   const pending = po.items.filter(i => i.quantity - i.receivedQty > 0)
+  // Admin-chosen default warehouse (if turned on) is pre-selected; otherwise the first one
+  const startWh = warehouses.find(w => w.isDefault)?.id ?? warehouses[0]?.id ?? ''
 
   const [note,  setNote]  = useState('')
+  const [invoiceNo,   setInvoiceNo]   = useState('')
+  const [invoiceDate, setInvoiceDate] = useState(today())
   const [hasLanded,  setHasLanded]  = useState(false)
   const [landedCost, setLandedCost] = useState('')
   const [landedMethod, setLandedMethod] = useState('credit')
   // itemDists: poItemId → list of distribution rows
   const [itemDists, setItemDists] = useState<Record<string, DistRow[]>>(
-    Object.fromEntries(pending.map(i => [i.id, [{ warehouseId: warehouses[0]?.id ?? '', quantity: 0 }]]))
+    Object.fromEntries(pending.map(i => [i.id, [{ warehouseId: startWh, quantity: 0 }]]))
   )
   const [loading, setLoad] = useState(false)
   const [err,     setErr]  = useState('')
@@ -188,11 +238,14 @@ function ReceiveModal({ po, warehouses, onClose, onSave }: {
     }
 
     if (hasLanded && (!landedCost || Number(landedCost) <= 0)) return setErr('Enter the landed cost amount, or turn it off.')
+    if (!invoiceNo.trim() && !window.confirm('No supplier invoice number entered. Receive the goods without it?')) return
 
     setLoad(true)
     try {
       await api.post(`/purchase-orders/${po.id}/receive`, {
         note: note || undefined,
+        supplierInvoiceNo: invoiceNo.trim() || undefined,
+        supplierInvoiceDate: invoiceNo.trim() && invoiceDate ? invoiceDate : undefined,
         items,
         landedCost: hasLanded ? Number(landedCost) : undefined,
         landedCostMethod: hasLanded ? landedMethod : undefined,
@@ -208,6 +261,16 @@ function ReceiveModal({ po, warehouses, onClose, onSave }: {
         <h2 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 700, color: DARK }}>Receive Goods — {po.poNumber}</h2>
         <p style={{ margin: '0 0 20px', fontSize: 13, color: '#64748B' }}>For each material, choose which warehouses receive stock and how many units each gets.</p>
 
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+          <label>
+            {lbl('Supplier Invoice No.')}
+            <input value={invoiceNo} onChange={e => setInvoiceNo(e.target.value)} placeholder="e.g. INV-55120" style={inp} />
+          </label>
+          <label>
+            {lbl('Supplier Invoice Date')}
+            <input type="date" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} style={inp} />
+          </label>
+        </div>
         <label style={{ display: 'block', marginBottom: 20 }}>
           {lbl('Note (optional)')}
           <input value={note} onChange={e => setNote(e.target.value)} style={inp} />
@@ -311,6 +374,11 @@ function ReceiveModal({ po, warehouses, onClose, onSave }: {
 
 // ── Main Page ──────────────────────────────────────────────────────────────
 export function PurchaseOrdersPage() {
+  const navigate = useNavigate()
+  const { can } = useAuth()
+  const [params, setParams] = useSearchParams()
+  const [requisitions, setReqs] = useState<ApprovedReq[]>([])
+  const [fromReq, setFromReq]   = useState<string | null>(null)
   const [data,       setData]  = useState<PO[]>([])
   const [suppliers,  setSupp]  = useState<Supplier[]>([])
   const [materials,  setMats]  = useState<Material[]>([])
@@ -326,16 +394,23 @@ export function PurchaseOrdersPage() {
   const load = async () => {
     setLoad(true)
     try {
-      const [r, s, m, w] = await Promise.all([
+      const [r, s, m, w, pr] = await Promise.all([
         api.get<{ data: PO[] }>('/purchase-orders?pageSize=200'),
         api.get<{ data: Supplier[] }>('/suppliers?pageSize=200'),
         api.get<{ data: Material[] }>('/materials?pageSize=500'),
         api.get<{ data: Warehouse[] }>('/warehouses?pageSize=100'),
+        api.get<{ data: ApprovedReq[] }>('/purchase-requisitions?status=approved&pageSize=200'),
       ])
-      setData(r.data); setSupp(s.data); setMats(m.data); setWh(w.data)
+      setData(r.data); setSupp(s.data); setMats(m.data); setWh(w.data); setReqs(pr.data.filter(r => r.toOrder !== false))
     } finally { setLoad(false) }
   }
   useEffect(() => { load() }, [])
+
+  // Arrived from Requisitions → "Create PO": open the new-PO form pre-filled
+  useEffect(() => {
+    const id = params.get('fromRequisition')
+    if (id) { setFromReq(id); setNew(true); params.delete('fromRequisition'); setParams(params, { replace: true }) }
+  }, [])
 
   const action = async (id: string, endpoint: string, label: string) => {
     if (!window.confirm(`${label}?`)) return
@@ -364,7 +439,7 @@ export function PurchaseOrdersPage() {
   const btnBase: React.CSSProperties = { fontSize: 11, padding: '3px 8px', borderRadius: 5, cursor: 'pointer', fontFamily: FONT, border: '1px solid #E2E8F0', background: '#fff' }
 
   const rows = filtered.map(r => ({
-    poNumber: <code style={{ fontSize: 12, cursor: 'pointer', color: '#1D4ED8' }} onClick={() => openDetail(r)}>{r.poNumber}</code>,
+    poNumber: <div><code style={{ fontSize: 12, cursor: 'pointer', color: '#1D4ED8' }} onClick={() => openDetail(r)}>{r.poNumber}</code>{r.requisition && <div style={{ fontSize: 10, color: '#64748B' }}>from {prNo(r.requisition.id)}</div>}</div>,
     supplier: r.supplier.name,
     lines:    r._count.items,
     total:    `AED ${Number(r.totalAmount).toFixed(2)}`,
@@ -381,6 +456,9 @@ export function PurchaseOrdersPage() {
         {['draft', 'confirmed'].includes(r.status) && (
           <button onClick={() => action(r.id, 'cancel', 'Cancel this Purchase Order')} disabled={actLoad === r.id} style={{ ...btnBase, color: '#EF4444', borderColor: '#FECACA' }}>Cancel</button>
         )}
+        {['partially_received', 'fully_received', 'closed'].includes(r.status) && can('feature.purchase_returns') && (
+          <button onClick={() => navigate(`/admin/purchase-returns?poId=${r.id}`)} style={{ ...btnBase, color: '#EA580C', borderColor: '#FED7AA' }}>Return</button>
+        )}
       </div>
     ),
   }))
@@ -392,7 +470,7 @@ export function PurchaseOrdersPage() {
     { key: 'total',    label: 'Total',    width: 120 },
     { key: 'status',   label: 'Status',   width: 110 },
     { key: 'expected', label: 'Expected', width: 100 },
-    { key: 'actions',  label: '',         width: 160 },
+    { key: 'actions',  label: '',         width: 190 },
   ]
 
   const totalValue = data.reduce((s, r) => s + Number(r.totalAmount), 0)
@@ -410,6 +488,21 @@ export function PurchaseOrdersPage() {
       <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 10, padding: '12px 16px', marginBottom: 20, fontSize: 13, color: '#14532D', fontFamily: FONT }}>
         <strong>Flow:</strong> Draft → Confirm → Receive Goods (auto-updates stock). You can also convert a quoted RFQ into a PO from the RFQs page.
       </div>
+
+      {/* Approved staff requests still waiting for a purchase order */}
+      {requisitions.length > 0 && (
+        <div style={{ background: '#fff', border: '1px solid #BFDBFE', borderRadius: 10, padding: '12px 16px', marginBottom: 20, fontFamily: FONT }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: '#1E3A8A', marginBottom: 8 }}>Approved purchase requests ({requisitions.length})</div>
+          {requisitions.map(r => (
+            <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderTop: '1px solid #EFF6FF', fontSize: 13, flexWrap: 'wrap' }}>
+              <b style={{ fontFamily: 'ui-monospace, monospace' }}>{prNo(r.id)}</b>
+              <span style={{ color: '#64748B' }}>by {r.requestedBy}{r._count ? ` · ${r._count.items} item${r._count.items === 1 ? '' : 's'}` : ''}{r.neededBy ? ` · needed by ${r.neededBy.slice(0, 10)}` : ''}{r.note ? ` · ${r.note}` : ''}</span>
+              {(r.purchaseOrders ?? []).length > 0 && <span style={{ fontSize: 12, color: '#10B981' }}>{(r.purchaseOrders ?? []).map(p => p.poNumber).join(', ')} raised</span>}
+              <button onClick={() => { setFromReq(r.id); setNew(true) }} style={{ marginLeft: 'auto', fontSize: 12, padding: '4px 12px', borderRadius: 6, cursor: 'pointer', fontFamily: FONT, border: '1px solid #1D4ED8', background: '#1D4ED8', color: '#fff' }}>Create PO</button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <StatGrid>
         <StatCard label="Total POs"     value={String(data.length)}                                                  sub="All orders" />
@@ -440,7 +533,8 @@ export function PurchaseOrdersPage() {
       }
 
       {showNew && (
-        <NewPOModal suppliers={suppliers} materials={materials} onClose={() => setNew(false)} onSave={load} />
+        <NewPOModal suppliers={suppliers} materials={materials} requisitions={requisitions} initialReqId={fromReq}
+          onClose={() => { setNew(false); setFromReq(null) }} onSave={load} />
       )}
       {receiving && (
         <ReceiveModal po={receiving} warehouses={warehouses} onClose={() => setReceiving(null)} onSave={load} />
@@ -453,7 +547,8 @@ export function PurchaseOrdersPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 16, color: DARK }}>{detail.poNumber}</div>
-                <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>{detail.supplier.name}</div>
+                <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>{detail.supplier.name}{detail.supplier.trn ? ` · TRN ${detail.supplier.trn}` : ''}</div>
+                {detail.requisition && <div style={{ fontSize: 12, color: '#1D4ED8', marginTop: 2, cursor: 'pointer' }} onClick={() => navigate('/admin/purchase-requisitions')}>Raised from requisition {prNo(detail.requisition.id)}</div>}
               </div>
               <button onClick={() => setDetail(null)} style={{ border: 'none', background: 'transparent', fontSize: 20, cursor: 'pointer', color: '#94A3B8' }}>×</button>
             </div>
@@ -484,6 +579,16 @@ export function PurchaseOrdersPage() {
                 <span>AED {Number(detail.totalAmount).toFixed(2)}</span>
               </div>
               {detail.note && <div style={{ fontSize: 12, color: '#64748B', marginTop: 8 }}>Note: {detail.note}</div>}
+              {(detail.receipts ?? []).length > 0 && (
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: DARK, marginBottom: 6 }}>Goods receipts</div>
+                  {(detail.receipts ?? []).map(gr => (
+                    <div key={gr.id} style={{ fontSize: 12, color: '#64748B', marginBottom: 4 }}>
+                      {gr.receivedDate.slice(0, 10)} · {gr.warehouse.name} · supplier invoice <b style={{ color: DARK }}>{gr.supplierInvoiceNo ?? '—'}</b>{gr.supplierInvoiceDate ? ` (${gr.supplierInvoiceDate.slice(0, 10)})` : ''}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AdminLayout, Table, SearchInput, Badge, StatCard, StatGrid, Btn } from '../components/AdminLayout'
 import { api } from '../../lib/api'
+import { today, monthStart } from '../lib/date'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
@@ -71,10 +72,10 @@ export function TaxFilingsPage() {
   const [statusFilter, setFilter] = useState('all')
   const [modal, setModal]       = useState<Partial<TaxFiling> | null>(null)
   const [acting, setActing]     = useState<string | null>(null)
-  const today = new Date().toISOString().slice(0, 10)
-  const firstOfMonth = today.slice(0, 8) + '01'
+  const todayStr = today()
+  const firstOfMonth = monthStart()
   const [vatFrom, setVatFrom]   = useState(firstOfMonth)
-  const [vatTo, setVatTo]       = useState(today)
+  const [vatTo, setVatTo]       = useState(todayStr)
   const [vatCalc, setVatCalc]   = useState<VatCalc | null>(null)
   const [vatLoading, setVatLoad] = useState(false)
 

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { AdminLayout, Table, Btn, SearchInput, Badge, StatCard, StatGrid } from '../components/AdminLayout'
 import { api } from '../../lib/api'
 import { PAGE_RIGHTS, FEATURE_RIGHTS, PRESETS } from '../lib/rights'
+import { PhoneList, tidyPhones } from '../components/PhoneList'
+import { today } from '../lib/date'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
@@ -13,7 +15,7 @@ interface PosRegister { id: string; name: string; assignedEmployeeId: string | n
 
 interface Employee {
   id: string; employeeNo: string; name: string; jobTitle: string | null
-  phone: string | null; email: string | null; nationalId: string | null
+  phone: string | null; phones?: string[]; email: string | null; nationalId: string | null
   contractType: string | null; salary: string | null; joinDate: string | null
   isActive: boolean; createdAt: string; role: string
   isOwner?: boolean; permissions?: string[] | null
@@ -51,13 +53,14 @@ function Modal({ emp, isNew, warehouses, departments, shifts, onClose, onSaved }
   const [employeeNo, setNo]         = useState(emp?.employeeNo ?? '')
   const [jobTitle, setTitle]        = useState(emp?.jobTitle ?? '')
   const [phone, setPhone]           = useState(emp?.phone ?? '')
+  const [phones, setPhones]         = useState<string[]>(emp?.phones ?? [])
   const [email, setEmail]           = useState(emp?.email ?? '')
   const [nationalId, setNatId]      = useState(emp?.nationalId ?? '')
   const [contractType, setContract] = useState(emp?.contractType ?? 'full_time')
   const [warehouseId, setWarehouse] = useState(emp?.warehouse?.id ?? '')
   const [departmentId, setDept]     = useState(emp?.department?.id ?? '')
   const [shiftId, setShift]         = useState(emp?.shift?.id ?? '')
-  const [joinDate, setJoinDate]     = useState(emp?.joinDate?.slice(0, 10) ?? '')
+  const [joinDate, setJoinDate]     = useState(emp?.joinDate?.slice(0, 10) ?? (isNew ? today() : ''))
   const [salary, setSalary]         = useState(emp?.salary ? String(Number(emp.salary)) : '')
   const [isActive, setActive]       = useState(emp?.isActive ?? true)
   const [saving, setSaving]         = useState(false)
@@ -82,7 +85,7 @@ function Modal({ emp, isNew, warehouses, departments, shifts, onClose, onSaved }
     try {
       const body = {
         name: name.trim(), jobTitle: jobTitle.trim() || null,
-        phone: phone.trim() || null, email: email.trim() || null,
+        phone: phone.trim() || null, phones: tidyPhones(phones), email: email.trim() || null,
         nationalId: nationalId.trim() || null, contractType,
         warehouseId: warehouseId || null,
         departmentId: departmentId || null, shiftId: shiftId || null,
@@ -142,6 +145,7 @@ function Modal({ emp, isNew, warehouses, departments, shifts, onClose, onSaved }
 
           <label><div>{lbl('Phone')}</div><input style={inp} value={phone} onChange={e => setPhone(e.target.value)} placeholder="+971 50 123 4567" /></label>
           <label><div>{lbl('Email')}</div><input style={inp} value={email} onChange={e => setEmail(e.target.value)} placeholder="ahmed@company.com" /></label>
+          <div style={{ gridColumn: '1/-1' }}><div>{lbl('Other phone numbers')}</div><PhoneList phones={phones} onChange={setPhones} inputStyle={inp} placeholder="+971 4 …" /></div>
           <label><div>{lbl('National ID / Emirates ID')}</div><input style={inp} value={nationalId} onChange={e => setNatId(e.target.value)} placeholder="784-XXXX-XXXXXXX-X" /></label>
           <label><div>{lbl('Join Date')}</div><input type="date" style={inp} value={joinDate} onChange={e => setJoinDate(e.target.value)} /></label>
           <label><div>{lbl('Monthly Salary (AED)')}</div><input type="number" min={0} step="0.01" style={inp} value={salary} onChange={e => setSalary(e.target.value)} placeholder="0.00" /></label>

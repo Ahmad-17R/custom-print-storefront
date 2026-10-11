@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { AdminLayout, Table, SearchInput, Badge, StatCard, StatGrid, Btn } from '../components/AdminLayout'
 import { api } from '../../lib/api'
+import { useAuth } from '../lib/AuthContext'
+import { loadVatConfig, type VatConfig } from '../lib/tax'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
@@ -57,8 +59,63 @@ function Modal({ item, countries, onClose, onSaved }: { item: Partial<TaxRate> |
 const COLS = [
   { key: 'name', label: 'Tax Name' }, { key: 'rate', label: 'Rate', width: 90 },
   { key: 'country', label: 'Country', width: 150 }, { key: 'isDefault', label: 'Default', width: 90 },
-  { key: 'status', label: 'Status', width: 90 }, { key: 'actions', label: '', width: 130 },
+  { key: 'status', label: 'Status', width: 90 }, { key: 'actions', label: '', width: 220 },
 ]
+
+// ── VAT settings: how VAT is charged everywhere (walk-in, POS, quotations, invoices) ──
+function VatSettings({ defaultRate }: { defaultRate: TaxRate | undefined }) {
+  const { can } = useAuth()
+  const editable = can('tax-rates')
+  const [cfg, setCfg] = useState<VatConfig | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState('')
+  useEffect(() => { loadVatConfig(true).then(setCfg) }, [defaultRate?.id, defaultRate?.rate])
+
+  const save = async (patch: Partial<Pick<VatConfig, 'enabled' | 'pricing'>>) => {
+    setSaving(true); setMsg('')
+    try { await api.patch('/tax/config', patch); setCfg(await loadVatConfig(true)); setMsg('Saved') }
+    catch (e: any) { setMsg(e?.message ?? 'Save failed') }
+    finally { setSaving(false) }
+  }
+  if (!cfg) return null
+  const opt = (active: boolean): React.CSSProperties => ({ flex: 1, textAlign: 'left', padding: '10px 12px', borderRadius: 10, cursor: editable ? 'pointer' : 'default', fontFamily: FONT, border: `2px solid ${active ? '#1D4ED8' : '#E2E8F0'}`, background: active ? '#EFF6FF' : '#fff' })
+  const ex = 100, r = cfg.ratePercent
+  return (
+    <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 12, padding: 20, marginBottom: 20, fontFamily: FONT }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 15, color: DARK }}>VAT Settings</div>
+          <div style={{ fontSize: 12, color: '#64748B' }}>Applies to walk-in sales, POS, quotations and their invoices. Per-customer exemptions are set on the customer (Customers → Edit → VAT treatment).</div>
+        </div>
+        {msg && <span style={{ fontSize: 12, color: msg === 'Saved' ? '#10B981' : '#EF4444' }}>{msg}</span>}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+        <div>
+          {lbl('1. Charge VAT')}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button disabled={!editable || saving} onClick={() => save({ enabled: true })} style={opt(cfg.enabled)}><b>On</b><div style={{ fontSize: 11, color: '#64748B' }}>VAT-registered — charge VAT</div></button>
+            <button disabled={!editable || saving} onClick={() => save({ enabled: false })} style={opt(!cfg.enabled)}><b>Off</b><div style={{ fontSize: 11, color: '#64748B' }}>Not registered — no VAT</div></button>
+          </div>
+        </div>
+        <div>
+          {lbl('2. Prices you enter are')}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button disabled={!editable || saving || !cfg.enabled} onClick={() => save({ pricing: 'inclusive' })} style={opt(cfg.pricing === 'inclusive')}><b>VAT inclusive</b><div style={{ fontSize: 11, color: '#64748B' }}>AED {ex} = {(ex / (1 + r / 100)).toFixed(2)} + {(ex - ex / (1 + r / 100)).toFixed(2)} VAT</div></button>
+            <button disabled={!editable || saving || !cfg.enabled} onClick={() => save({ pricing: 'exclusive' })} style={opt(cfg.pricing === 'exclusive')}><b>VAT exclusive</b><div style={{ fontSize: 11, color: '#64748B' }}>AED {ex} + {(ex * r / 100).toFixed(2)} VAT = {(ex * (1 + r / 100)).toFixed(2)}</div></button>
+          </div>
+        </div>
+        <div>
+          {lbl('3. VAT rate')}
+          <div style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid #E2E8F0', background: '#F8FAFC' }}>
+            <b style={{ fontSize: 18 }}>{cfg.enabled ? `${cfg.ratePercent}%` : '—'}</b>
+            <div style={{ fontSize: 11, color: '#64748B' }}>{defaultRate ? `From the default rate "${defaultRate.name}" below — use "Set default" to change it` : 'No default rate set — 5% is used. Mark a rate below as default.'}</div>
+          </div>
+        </div>
+      </div>
+      <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 12 }}>The online shop always shows VAT-inclusive prices (consumer prices must include VAT); it follows the on/off switch and the rate. {!editable && 'You can view but not change these settings.'}</div>
+    </div>
+  )
+}
 
 export function TaxRatesPage() {
   const [data, setData]         = useState<TaxRate[]>([])
@@ -85,6 +142,12 @@ export function TaxRatesPage() {
     catch (e: any) { alert(e?.message ?? 'Delete failed') }
   }
 
+  const makeDefault = async (r: TaxRate) => {
+    if (!confirm(`Use "${r.name}" (${Number(r.rate)}%) as the VAT rate for all sales?`)) return
+    try { await api.patch(`/tax-rates/${r.id}`, { isDefault: true }); load() }
+    catch (e: any) { alert(e?.message ?? 'Update failed') }
+  }
+
   const btnS: React.CSSProperties = { fontSize: 12, padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontFamily: FONT }
   const filtered = data.filter(r => r.name.toLowerCase().includes(q.toLowerCase()) || (r.country?.name ?? '').toLowerCase().includes(q.toLowerCase()))
   const rows = filtered.map(r => ({
@@ -96,6 +159,7 @@ export function TaxRatesPage() {
     actions: (
       <div style={{ display: 'flex', gap: 6 }}>
         <button onClick={() => setModal(r)} style={{ ...btnS, border: '1px solid #E2E8F0', background: '#fff' }}>Edit</button>
+        {!r.isDefault && r.isActive && <button onClick={() => makeDefault(r)} style={{ ...btnS, border: '1px solid #DDD6FE', background: '#F5F3FF', color: '#7C3AED' }}>Set default</button>}
         <button onClick={() => del(r.id, r.name)} style={{ ...btnS, border: '1px solid #FECACA', background: '#FEF2F2', color: '#DC2626' }}>Delete</button>
       </div>
     ),
@@ -109,6 +173,7 @@ export function TaxRatesPage() {
         <StatCard label="Default Rate" value={data.find(r => r.isDefault)?.name ?? 'None'} sub="Default tax rate" color="#8B5CF6" />
         <StatCard label="Countries" value={String(new Set(data.filter(r => r.country).map(r => r.country?.id)).size)} sub="Unique countries" color="#1D4ED8" />
       </StatGrid>
+      <VatSettings defaultRate={data.find(r => r.isDefault && r.isActive)} />
       {loading ? <div style={{ padding: 40, textAlign: 'center', color: '#94A3B8', fontFamily: FONT }}>Loading…</div>
         : <Table columns={COLS} rows={rows} />}
       {modal !== null && <Modal item={modal} countries={countries} onClose={() => setModal(null)} onSaved={load} />}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AdminLayout, Table, SearchInput, Badge, StatCard, StatGrid, Btn } from '../components/AdminLayout'
 import { api } from '../../lib/api'
+import { today } from '../lib/date'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
@@ -22,7 +23,7 @@ function Modal({ accounts, onClose, onSaved }: { accounts: Account[]; onClose: (
   const [description, setDesc]  = useState('')
   const [debit, setDebit]       = useState('')
   const [credit, setCredit]     = useState('')
-  const [entryDate, setDate]    = useState(new Date().toISOString().slice(0, 10))
+  const [entryDate, setDate]    = useState(today())
   const [saving, setSaving]     = useState(false)
   const [err, setErr]           = useState('')
 

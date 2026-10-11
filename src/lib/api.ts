@@ -180,6 +180,9 @@ export interface CustomerOrder {
   deliveryNotes: string | null; createdAt: string
   items: CustomerOrderItem[]
   timeline: Array<{ id: string; status: string; note: string | null; createdAt: string }>
+  amountPaid?: string; placedByName?: string | null
+  proofStatus?: 'sent' | 'approved' | 'changes_requested' | null; proofFileUrl?: string | null; proofFileName?: string | null
+  proofComment?: string | null; proofSentAt?: string | null; proofApprovedAt?: string | null
 }
 
 export const uploadCustomerFile = async (file: File, accessToken: string) => {
@@ -187,8 +190,10 @@ export const uploadCustomerFile = async (file: File, accessToken: string) => {
   body.append('file', file)
   return customerRequest<{ token: string; originalName: string; mimeType: string; size: number }>('POST', '/uploads', accessToken, body)
 }
+// A team login over its spending limit gets { approvalRequired } back instead of an order
+export type OrderApprovalPending = { approvalRequired: true; requestId: string; total: number; message: string }
 export const createCustomerOrder = (payload: unknown, accessToken: string) =>
-  customerRequest<CustomerOrder>('POST', '/orders', accessToken, payload)
+  customerRequest<CustomerOrder | OrderApprovalPending>('POST', '/orders', accessToken, payload)
 export const fetchCustomerOrders = (accessToken: string) => customerGet<CustomerOrder[]>('/orders', accessToken)
 export const fetchCustomerOrder = (id: string, accessToken: string) => customerGet<CustomerOrder>(`/orders/${id}`, accessToken)
 export const cancelCustomerOrder = (id: string, accessToken: string, note?: string) =>
@@ -345,4 +350,56 @@ export async function fetchMe(): Promise<AuthEmployee | null> {
     posRegisterId: p.posRegisterId ?? null,
     posRegisterName: p.posRegisterName ?? null,
   }
+}
+
+// ── Customer portal (team logins, invoices, statement, proofs, messages, quotes) ─
+export interface PortalMember {
+  id: string; name: string; email: string; canOrder: boolean; canViewOrders: boolean; canViewInvoices: boolean
+  spendLimit: string | null; approvalOverLimit: boolean; expiresAt: string | null; isActive: boolean; lastLoginAt: string | null; createdAt: string
+}
+export interface PortalWhoami {
+  account: { id: string; email: string; name: string; customerType: string | null } | null
+  member: { id: string; name: string; email: string; canOrder: boolean; canViewOrders: boolean; canViewInvoices: boolean; spendLimit: number | null; approvalOverLimit: boolean } | null
+}
+export interface PortalOrderRequest { id: string; status: 'pending' | 'approved' | 'rejected'; total: string; orderId: string | null; note: string | null; createdAt: string; payload: { items: { productId: string; quantity: number }[] }; member: { name: string; email: string; spendLimit: string | null } }
+export interface PortalInvoice {
+  id: string; invoiceNumber: string; type: 'invoice' | 'credit_note'; status: string; issueDate: string
+  subtotal: string; vatAmount: string; total: string; notes: string | null
+  order: CustomerOrder & { customer?: { fullName: string | null; email: string; companyName: string | null; trn: string | null; phone: string | null } }
+}
+export interface PortalStatementRow { date: string; type: string; ref: string; orderNumber: string; description: string; debit: number; credit: number; balance: number }
+export interface PortalStatement { customer: { fullName: string | null; companyName: string | null; email: string; trn: string | null; phone: string | null } | null; opening: number; closing: number; rows: PortalStatementRow[]; totals: { debit: number; credit: number } }
+export interface PortalBalance { outstanding: number; totalPaid: number; totalSpend: number; credit: number; openOrders: number }
+export interface OrderMessage { id: string; sender: 'customer' | 'staff'; authorName: string; body: string; fileUrl: string | null; fileName: string | null; createdAt: string }
+export interface PortalQuote {
+  id: string; quoteNumber: string | null; status: 'requested' | 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired'
+  validUntil: string | null; subtotal: string | number; vatAmount: string | number; total: string | number
+  notes: string | null; requestNote: string | null; createdAt: string
+  items: { id: string; productName: string | null; description: string | null; quantity: number; unitPrice: string | number; total: string | number }[]
+}
+export type MemberInput = Partial<{ name: string; email: string; password: string; canOrder: boolean; canViewOrders: boolean; canViewInvoices: boolean; spendLimit: number | null; approvalOverLimit: boolean; expiresAt: string | null; isActive: boolean }>
+
+export const portal = {
+  whoami:        (t: string) => customerGet<PortalWhoami>('/portal/whoami', t),
+  members:       (t: string) => customerGet<PortalMember[]>('/portal/members', t),
+  addMember:     (t: string, b: MemberInput) => customerRequest<PortalMember>('POST', '/portal/members', t, b),
+  updateMember:  (t: string, id: string, b: MemberInput) => customerRequest<PortalMember>('PATCH', `/portal/members/${id}`, t, b),
+  removeMember:  (t: string, id: string) => customerRequest<void>('DELETE', `/portal/members/${id}`, t),
+  requests:      (t: string) => customerGet<PortalOrderRequest[]>('/portal/order-requests', t),
+  approve:       (t: string, id: string) => customerRequest<CustomerOrder>('POST', `/portal/order-requests/${id}/approve`, t, {}),
+  reject:        (t: string, id: string, note?: string) => customerRequest<PortalOrderRequest>('POST', `/portal/order-requests/${id}/reject`, t, { note }),
+  invoices:      (t: string) => customerGet<PortalInvoice[]>('/portal/invoices', t),
+  invoice:       (t: string, id: string) => customerGet<PortalInvoice>(`/portal/invoices/${id}`, t),
+  statement:     (t: string, from?: string, to?: string) => customerGet<PortalStatement>(`/portal/statement?${new URLSearchParams({ ...(from ? { from } : {}), ...(to ? { to } : {}) })}`, t),
+  balance:       (t: string) => customerGet<PortalBalance>('/portal/balance', t),
+  approveProof:  (t: string, orderId: string) => customerRequest<{ ok: true }>('POST', `/portal/orders/${orderId}/proof/approve`, t, {}),
+  proofChanges:  (t: string, orderId: string, comment: string) => customerRequest<{ ok: true }>('POST', `/portal/orders/${orderId}/proof/changes`, t, { comment }),
+  messages:      (t: string, orderId: string) => customerGet<OrderMessage[]>(`/portal/orders/${orderId}/messages`, t),
+  sendMessage:   (t: string, orderId: string, body: string) => customerRequest<OrderMessage>('POST', `/portal/orders/${orderId}/messages`, t, { body }),
+  unread:        (t: string) => customerGet<{ count: number }>('/portal/messages/unread', t),
+  quotes:        (t: string) => customerGet<PortalQuote[]>('/portal/quotes', t),
+  requestQuote:  (t: string, b: { note: string; items: { productId: string; quantity: number; description?: string }[] }) => customerRequest<PortalQuote>('POST', '/portal/quotes', t, b),
+  acceptQuote:   (t: string, id: string) => customerRequest<PortalQuote>('POST', `/portal/quotes/${id}/accept`, t, {}),
+  rejectQuote:   (t: string, id: string, reason?: string) => customerRequest<PortalQuote>('POST', `/portal/quotes/${id}/reject`, t, { reason }),
+  myPrices:      (t: string) => customerGet<{ group: { name: string; discountPercent: number } | null; prices: Record<string, { base: number; price: number }> }>('/portal/my-prices', t),
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AdminLayout, Table, Btn, SearchInput, Badge, StatCard, StatGrid } from '../components/AdminLayout'
 import { api } from '../../lib/api'
+import { PhoneList, tidyPhones } from '../components/PhoneList'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
@@ -12,6 +13,7 @@ interface AppUser {
   id: string
   fullName: string
   email: string
+  phones?: string[]
   isActive: boolean
   roleId: string | null
   departmentId: string | null
@@ -31,6 +33,7 @@ const ROLE_COLORS: Record<string, string> = {
 const COLS = [
   { key: 'fullName',   label: 'Name' },
   { key: 'email',      label: 'Email' },
+  { key: 'phones',     label: 'Phone(s)', width: 170 },
   { key: 'role',       label: 'Role',    width: 140 },
   { key: 'branch',     label: 'Dept',    width: 140 },
   { key: 'status',     label: 'Status',  width: 90  },
@@ -53,6 +56,7 @@ interface ModalProps {
 
 function Modal({ user, isNew, roles, departments, onClose, onSaved }: ModalProps) {
   const [fullName, setFullName]     = useState(user?.fullName ?? '')
+  const [phones, setPhones]         = useState<string[]>(user?.phones ?? [])
   const [email, setEmail]           = useState(user?.email ?? '')
   const [roleId, setRoleId]         = useState(user?.roleId ?? '')
   const [departmentId, setDeptId]   = useState(user?.departmentId ?? '')
@@ -70,6 +74,7 @@ function Modal({ user, isNew, roles, departments, onClose, onSaved }: ModalProps
         roleId: roleId || null,
         departmentId: departmentId || null,
         isActive,
+        phones: tidyPhones(phones),
       }
       if (isNew) {
         await api.post('/users', body)
@@ -98,6 +103,10 @@ function Modal({ user, isNew, roles, departments, onClose, onSaved }: ModalProps
           <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 4 }}>Email Address *</span>
           <input value={email} onChange={e => setEmail(e.target.value)} type="email" style={inp} />
         </label>
+        <div style={{ marginBottom: 14 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 4 }}>Phone numbers</span>
+          <PhoneList phones={phones} onChange={setPhones} inputStyle={inp} />
+        </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
           <label>
@@ -167,6 +176,7 @@ export function UsersPage() {
   const rows = filtered.map(u => ({
     fullName: u.fullName,
     email:    u.email,
+    phones:   u.phones?.length ? u.phones.join(' · ') : '—',
     role:     u.role
       ? <Badge label={u.role.name} color={ROLE_COLORS[u.role.name] ?? '#64748B'} />
       : <span style={{ color: '#94A3B8', fontSize: 12 }}>—</span>,

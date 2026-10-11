@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { AdminLayout, Table, SearchInput, Badge, StatCard, StatGrid } from '../components/AdminLayout'
 import { api } from '../../lib/api'
+import { useAuth } from '../lib/AuthContext'
+import { printInvoiceById } from '../lib/invoicePrint'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
@@ -29,6 +31,41 @@ interface OrderFull extends OrderRow {
 }
 interface Warehouse { id: string; name: string }
 
+// ── Invoice / cancelled-order credit for finished orders ─────────────────────
+function MoneyBar({ order }: { order: OrderFull }) {
+  const { can } = useAuth()
+  const [invoice, setInvoice] = useState<{ id: string; invoiceNumber: string; status: string } | null>(null)
+  const [movable, setMovable] = useState(0)
+  const [busy, setBusy] = useState(false)
+  const load = useCallback(() => {
+    api.get<{ id: string; invoiceNumber: string; status: string } | null>(`/sales-invoices/for/walk_in/${order.id}`).then(setInvoice).catch(() => setInvoice(null))
+    if (order.status === 'cancelled') api.get<{ movable: number }>(`/customer-deposits/from-sale/${order.id}`).then(r => setMovable(r.movable)).catch(() => setMovable(0))
+  }, [order.id, order.status])
+  useEffect(() => { load() }, [load])
+
+  const keep = async () => {
+    if (!window.confirm(`Keep AED ${fmt(movable)} collected on this cancelled order as ${order.customer.name}'s credit?\nIt can then be applied to their next order.`)) return
+    setBusy(true)
+    try { await api.post(`/customer-deposits/from-sale/${order.id}`, {}); load() }
+    catch (e: unknown) { alert(e instanceof Error ? e.message : 'Error') }
+    finally { setBusy(false) }
+  }
+  if (!invoice && !(movable > 0 && can('feature.refunds'))) return null
+  const btn = { padding: '6px 14px', borderRadius: 8, fontFamily: FONT, fontSize: 12, fontWeight: 600, cursor: 'pointer' } as const
+  return (
+    <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', background: '#fff', border: '1px solid #E2E8F0', borderRadius: 10, padding: '10px 16px', marginBottom: 16, fontFamily: FONT, fontSize: 13 }}>
+      {invoice && <>
+        <span>Tax invoice <b>{invoice.invoiceNumber}</b>{invoice.status === 'cancelled' ? ' (cancelled)' : ''}</span>
+        <button onClick={() => printInvoiceById(invoice.id)} style={{ ...btn, border: '1px solid #E2E8F0', background: '#fff' }}>Print</button>
+      </>}
+      {movable > 0 && can('feature.refunds') && <>
+        <span style={{ color: '#92400E', marginLeft: invoice ? 'auto' : 0 }}>AED {fmt(movable)} was collected on this cancelled order</span>
+        <button disabled={busy} onClick={keep} style={{ ...btn, border: '1px solid #FDE68A', background: '#FFFBEB', color: '#92400E' }}>Keep as customer credit</button>
+      </>}
+    </div>
+  )
+}
+
 // ── Detail view ───────────────────────────────────────────────────────────────
 function SummaryDetail({ order, warehouses, onBack }: { order: OrderFull; warehouses: Warehouse[]; onBack: () => void }) {
   const balance      = Number(order.totalAmount) - Number(order.advancePaid)
@@ -55,6 +92,7 @@ function SummaryDetail({ order, warehouses, onBack }: { order: OrderFull; wareho
         <StatCard label="Jobs"         value={`${doneJobs}/${order.jobs.length}`} sub={`${inHouse} in-house · ${outsourced} supplier`} color="#3B82F6" />
         <StatCard label="Job Costs"    value={`AED ${fmt(supplierCost + materialCost)}`} sub={`Supplier ${fmt(supplierCost)} · Materials ${fmt(materialCost)}`} color="#7C3AED" />
       </StatGrid>
+      <MoneyBar order={order} />
 
       {/* Jobs breakdown */}
       <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 15, color: DARK, margin: '8px 0 12px' }}>Jobs — who did what</div>

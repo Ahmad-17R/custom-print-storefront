@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AdminLayout, Table, Btn, SearchInput, Badge, StatCard, StatGrid } from '../components/AdminLayout'
 import { api } from '../../lib/api'
+import { monthStart, monthEnd } from '../lib/date'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
@@ -29,9 +30,8 @@ const inp: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '
 const lbl = (t: string) => <div style={{ fontSize: 12, fontWeight: 600, color: '#64748B', marginBottom: 4, fontFamily: FONT }}>{t}</div>
 
 function NewRunModal({ countries, onClose, onSaved }: { countries: Country[]; onClose: () => void; onSaved: () => void }) {
-  const now = new Date()
-  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
-  const lastDay  = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10)
+  const firstDay = monthStart()
+  const lastDay  = monthEnd()
   const [countryId, setCountry]   = useState(countries[0]?.id ?? '')
   const [periodStart, setStart]   = useState(firstDay)
   const [periodEnd, setEnd]       = useState(lastDay)

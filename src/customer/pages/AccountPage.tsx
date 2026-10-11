@@ -6,9 +6,10 @@ import { supabase } from '../../lib/supabase'
 import {
   fetchCustomerProfile, updateCustomerProfile, fetchCustomerOrders,
   addCustomerAddress, updateCustomerAddress, deleteCustomerAddress,
-  type CustomerProfile, type CustomerAddress, type AddressInput, type CustomerOrder,
+  portal, type CustomerProfile, type CustomerAddress, type AddressInput, type CustomerOrder, type PortalWhoami, type PortalBalance,
 } from '../../lib/api'
 import { orderToCartItems } from '../lib/reorder'
+import { TeamTab, BillingTab, QuotesTab } from '../components/PortalTabs'
 
 const BLUE = '#1D4ED8'
 const money = (v: string | number) => `AED ${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
@@ -16,6 +17,9 @@ const STATUS_COLOR: Record<string, string> = { pending: '#D97706', confirmed: '#
 const NAV: { id: Tab; label: string; icon: string }[] = [
   { id: 'overview',  label: 'Overview',        icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
   { id: 'orders',    label: 'My Orders',       icon: 'M3 6l1 12h16l1-12H3zM8 6V4a2 2 0 014 0v2' },
+  { id: 'billing',   label: 'Invoices & Statement', icon: 'M9 7h6M9 11h6M9 15h4M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2V3z' },
+  { id: 'quotes',    label: 'Quotes',          icon: 'M4 4h16v12H5.17L4 17.17V4zM8 8h8M8 12h5' },
+  { id: 'team',      label: 'Team & Approvals', icon: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75' },
   { id: 'addresses', label: 'Saved Addresses', icon: 'M12 11a3 3 0 100-6 3 3 0 000 6zM12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z' },
   { id: 'profile',   label: 'Profile',         icon: 'M12 12a5 5 0 100-10 5 5 0 000 10zM3 22a9 9 0 0118 0' },
 ]
@@ -26,13 +30,18 @@ const label: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: '#647
 const card: React.CSSProperties = { background: '#fff', border: '1px solid #E2E8F0', borderRadius: 12, padding: 22 }
 const btn = (primary = true): React.CSSProperties => ({ padding: '9px 18px', borderRadius: 8, border: primary ? 'none' : '1px solid #E2E8F0', background: primary ? BLUE : '#fff', color: primary ? '#fff' : '#334155', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'system-ui' })
 
-type Tab = 'overview' | 'orders' | 'addresses' | 'profile'
+type Tab = 'overview' | 'orders' | 'billing' | 'quotes' | 'team' | 'addresses' | 'profile'
 
 export function AccountPage() {
   const { session, user, signOut } = useAuth()
   const token = session?.access_token
   const [params, setParams] = useSearchParams()
-  const tab = (['overview', 'orders', 'addresses', 'profile'].includes(params.get('tab') ?? '') ? params.get('tab') : 'overview') as Tab
+  const [me, setMe] = useState<PortalWhoami | null>(null)
+  const [balance, setBalance] = useState<PortalBalance | null>(null)
+  // Authorised users (team logins) only get what the account owner allowed
+  const member = me?.member ?? null
+  const nav = NAV.filter(n => !member || (n.id === 'billing' ? member.canViewInvoices : !['addresses', 'profile'].includes(n.id)))
+  const tab = (nav.some(n => n.id === params.get('tab')) ? params.get('tab') : 'overview') as Tab
   const setTab = (t: Tab) => setParams(p => { const n = new URLSearchParams(p); n.set('tab', t); return n }, { replace: true })
   const [profile, setProfile] = useState<CustomerProfile | null>(null)
   const [orders, setOrders] = useState<CustomerOrder[]>([])
@@ -44,6 +53,7 @@ export function AccountPage() {
     Promise.all([
       fetchCustomerProfile(token).then(setProfile),
       fetchCustomerOrders(token).then(setOrders).catch(() => {}),
+      portal.whoami(token).then(w => { setMe(w); if (!w.member || w.member.canViewInvoices) portal.balance(token).then(setBalance).catch(() => {}) }).catch(() => {}),
     ]).catch(e => setError(e instanceof Error ? e.message : 'Could not load')).finally(() => setLoading(false))
   }, [token])
 
@@ -63,11 +73,13 @@ export function AccountPage() {
           <div style={{ display: 'flex', gap: 11, alignItems: 'center', padding: '4px 6px 14px', borderBottom: '1px solid #F1F5F9', marginBottom: 10 }}>
             <span style={{ width: 42, height: 42, borderRadius: '50%', background: BLUE, color: '#fff', fontSize: 18, fontWeight: 700, display: 'grid', placeItems: 'center' }}>{initials}</span>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{profile?.fullName ?? 'My account'}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{member ? member.name : profile?.fullName ?? 'My account'}</div>
+              {member && <div style={{ fontSize: 11, color: '#7C3AED', fontWeight: 600 }}>Authorised user · {me?.account?.name}</div>}
+              {!member && me?.account?.customerType && <div style={{ fontSize: 11, color: '#059669', fontWeight: 600 }}>{me.account.customerType} rates</div>}
               <div style={{ fontSize: 12, color: '#94A3B8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.email}</div>
             </div>
           </div>
-          {NAV.map(n => (
+          {nav.map(n => (
             <button key={n.id} onClick={() => setTab(n.id)} style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', textAlign: 'left', padding: '10px 12px', marginBottom: 3, borderRadius: 9, border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600, fontFamily: 'system-ui', background: tab === n.id ? '#EFF6FF' : 'transparent', color: tab === n.id ? BLUE : '#475569' }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={n.icon} /></svg>
               {n.label}
@@ -83,7 +95,10 @@ export function AccountPage() {
         <main style={{ minWidth: 0 }}>
           {loading ? <div style={{ ...card, color: '#64748B' }}>Loading…</div>
             : error ? <div style={{ ...card, color: '#B91C1C' }}>{error}</div>
-            : tab === 'overview'  ? <OverviewTab profile={profile} orders={orders} onGo={setTab} />
+            : tab === 'overview'  ? <OverviewTab profile={profile} orders={orders} onGo={setTab} balance={balance} memberName={member?.name} />
+            : tab === 'billing'   ? <BillingTab token={token!} />
+            : tab === 'quotes'    ? <QuotesTab token={token!} />
+            : tab === 'team' && me ? <TeamTab token={token!} me={me} />
             : tab === 'orders'    ? <OrdersTab orders={orders} />
             : tab === 'addresses' && profile ? <AddressesTab token={token!} profile={profile} onChange={setProfile} />
             : tab === 'profile'   && profile ? <div style={{ display: 'grid', gap: 20 }}><ProfileTab token={token!} profile={profile} onSaved={setProfile} /><PasswordTab /></div>
@@ -100,13 +115,13 @@ function StatCard({ label, value, color = '#0F172A' }: { label: string; value: s
 
 const ACTIVE = new Set(['pending', 'confirmed', 'in_production', 'ready', 'out_for_delivery'])
 
-function OverviewTab({ profile, orders, onGo }: { profile: CustomerProfile | null; orders: CustomerOrder[]; onGo: (t: Tab) => void }) {
+function OverviewTab({ profile, orders, onGo, balance, memberName }: { profile: CustomerProfile | null; orders: CustomerOrder[]; onGo: (t: Tab) => void; balance: PortalBalance | null; memberName?: string }) {
   const active = orders.filter(o => ACTIVE.has(o.status)).length
   const spent = orders.filter(o => !['cancelled', 'refunded'].includes(o.status)).reduce((s, o) => s + Number(o.total), 0)
   return (
     <div style={{ display: 'grid', gap: 18 }}>
       <div>
-        <h1 style={{ fontSize: 24, margin: '0 0 4px' }}>Welcome back{profile?.fullName ? `, ${profile.fullName.split(' ')[0]}` : ''} 👋</h1>
+        <h1 style={{ fontSize: 24, margin: '0 0 4px' }}>Welcome back{memberName ? `, ${memberName.split(' ')[0]}` : profile?.fullName ? `, ${profile.fullName.split(' ')[0]}` : ''} 👋</h1>
         <p style={{ color: '#64748B', margin: 0, fontSize: 14 }}>Here's a quick look at your account.</p>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14 }}>
@@ -115,6 +130,12 @@ function OverviewTab({ profile, orders, onGo }: { profile: CustomerProfile | nul
         <StatCard label="Total spent" value={money(spent)} color="#059669" />
         <StatCard label="Saved addresses" value={profile?.addresses.length ?? 0} color={BLUE} />
       </div>
+      {balance && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14 }}>
+        <StatCard label="Balance due" value={money(balance.outstanding)} color={balance.outstanding > 0 ? '#DC2626' : '#059669'} />
+        <StatCard label="Total paid" value={money(balance.totalPaid)} color="#059669" />
+        <StatCard label="Credit in your favour" value={money(balance.credit)} color={BLUE} />
+        <button onClick={() => onGo('billing')} style={{ ...card, padding: 18, cursor: 'pointer', textAlign: 'left', fontSize: 14, fontWeight: 700, color: BLUE }}>Invoices & statement →</button>
+      </div>}
       <div style={card}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <h2 style={{ fontSize: 16, margin: 0 }}>Recent orders</h2>
@@ -164,6 +185,8 @@ function OrderRow({ order, detailed }: { order: CustomerOrder; detailed?: boolea
         <div style={{ display: 'flex', gap: 9, alignItems: 'center', flexWrap: 'wrap' }}>
           <strong style={{ fontSize: 14 }}>{order.orderNumber}</strong>
           <span style={{ color: STATUS_COLOR[order.status] ?? '#64748B', fontSize: 11, fontWeight: 800, textTransform: 'capitalize' }}>{order.status.replaceAll('_', ' ')}</span>
+          {order.proofStatus === 'sent' && <span style={{ fontSize: 11, fontWeight: 800, color: '#D97706', background: '#FEF3C7', padding: '1px 8px', borderRadius: 999 }}>Proof awaiting your approval</span>}
+          {order.placedByName && <span style={{ fontSize: 11, color: '#7C3AED' }}>by {order.placedByName}</span>}
         </div>
         <div style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>{new Date(order.createdAt).toLocaleDateString()} · {order.items.map(i => `${i.productName}×${i.quantity}`).join(', ')}</div>
         {msg && <div style={{ fontSize: 11, color: '#D97706', marginTop: 4 }}>{msg}</div>}

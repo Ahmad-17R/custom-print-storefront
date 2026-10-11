@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AdminLayout, Table, Btn, SearchInput, Badge, StatCard, StatGrid } from '../components/AdminLayout'
 import { api } from '../../lib/api'
+import { today } from '../lib/date'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
@@ -29,8 +30,8 @@ interface ModalProps { employees: Employee[]; onClose: () => void; onSaved: () =
 function NewLeaveModal({ employees, onClose, onSaved }: ModalProps) {
   const [employeeId, setEmp]  = useState('')
   const [leaveType, setType]  = useState('annual')
-  const [startDate, setStart] = useState('')
-  const [endDate, setEnd]     = useState('')
+  const [startDate, setStart] = useState(today())
+  const [endDate, setEnd]     = useState(today())
   const [reason, setReason]   = useState('')
   const [saving, setSaving]   = useState(false)
   const [err, setErr]         = useState('')

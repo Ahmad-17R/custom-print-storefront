@@ -1,20 +1,23 @@
 import React, { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { AdminLayout, Table, Btn, SearchInput, StatCard, StatGrid } from '../components/AdminLayout'
 import { api } from '../../lib/api'
+import { useAuth } from '../lib/AuthContext'
+import { today } from '../lib/date'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
 
 interface Material  { id: string; name: string; unit: string }
 interface Supplier  { id: string; name: string }
-interface Warehouse { id: string; name: string }
+interface Warehouse { id: string; name: string; isDefault?: boolean }
 interface PO        { id: string; poNumber: string; supplier: Supplier }
 interface ReturnItem {
   id: string; materialId: string; quantity: number; reason: string | null
   material: Material
 }
 interface PurchaseReturn {
-  id: string; reason: string; note: string | null; returnDate: string; createdAt: string
+  id: string; reason: string; note: string | null; returnDate: string; createdAt: string; totalAmount?: string; createdBy?: string | null
   po: { id: string; poNumber: string }
   supplier: Supplier
   items: ReturnItem[]
@@ -24,54 +27,82 @@ interface PurchaseReturn {
 const inp: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 13, fontFamily: FONT, boxSizing: 'border-box', outline: 'none' }
 const lbl = (t: string) => <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 4 }}>{t}</span>
 
-interface LineItem { materialId: string; warehouseId: string; quantity: number; reason: string }
+interface ReturnableLine {
+  materialId: string; name: string; unit: string; unitPrice: number
+  received: number; returned: number; returnable: number
+  stock: { warehouseId: string; warehouseName: string; quantity: number }[]
+}
+interface Returnable { po: { id: string; poNumber: string; status: string; supplier: Supplier }; canReturn: boolean; lines: ReturnableLine[] }
+interface LineState { warehouseId: string; quantity: string; reason: string }
 
-function NewReturnModal({ suppliers, warehouses, onClose, onSave }: {
-  suppliers: Supplier[]; warehouses: Warehouse[]; onClose: () => void; onSave: () => void
+// Returns are raised against a received PO: only its materials, at most received − already
+// returned, valued at the PO price. Needs the "return goods from purchase orders" right.
+function NewReturnModal({ suppliers, warehouses, initialPoId, onClose, onSave }: {
+  suppliers: Supplier[]; warehouses: Warehouse[]; initialPoId?: string | null; onClose: () => void; onSave: () => void
 }) {
   const [supplierId, setSupplier] = useState(suppliers[0]?.id ?? '')
   const [pos,        setPOs]      = useState<PO[]>([])
-  const [poId,       setPoId]     = useState('')
+  const [poId,       setPoId]     = useState(initialPoId ?? '')
+  const [info,       setInfo]     = useState<Returnable | null>(null)
   const [reason,     setReason]   = useState('')
-  const [returnDate, setDate]     = useState('')
+  const [returnDate, setDate]     = useState(today())
   const [note,       setNote]     = useState('')
-  const [lines, setLines]         = useState<LineItem[]>([{ materialId: '', warehouseId: warehouses[0]?.id ?? '', quantity: 1, reason: '' }])
-  const [materials,  setMaterials] = useState<Material[]>([])
+  const [lines,      setLines]    = useState<Record<string, LineState>>({})
   const [loading,    setLoad]     = useState(false)
   const [err,        setErr]      = useState('')
 
-  // Load received POs for selected supplier
+  // Opened from a PO's "Return" button: jump straight to that PO and its supplier
+  useEffect(() => {
+    if (!initialPoId) return
+    api.get<Returnable>(`/purchase-returns/returnable/${initialPoId}`).then(r => setSupplier(r.po.supplier.id)).catch(() => {})
+  }, [initialPoId])
+
+  // Received POs for the selected supplier
   useEffect(() => {
     if (!supplierId) return
-    api.get<{ data: PO[] }>(`/purchase-orders?supplierId=${supplierId}&pageSize=100`)
+    api.get<{ data: (PO & { status: string })[] }>(`/purchase-orders?supplierId=${supplierId}&pageSize=100`)
       .then(r => {
-        const received = r.data.filter((p: any) => ['partially_received', 'fully_received'].includes(p.status))
+        const received = r.data.filter(p => ['partially_received', 'fully_received', 'closed'].includes(p.status))
         setPOs(received)
-        setPoId(received[0]?.id ?? '')
+        setPoId(prev => received.some(p => p.id === prev) ? prev : received[0]?.id ?? '')
       }).catch(() => {})
   }, [supplierId])
 
-  // Load materials in stock across selected warehouses
   useEffect(() => {
-    api.get<{ data: Material[] }>('/materials?pageSize=500')
-      .then(r => setMaterials(r.data)).catch(() => {})
-  }, [])
+    if (!poId) { setInfo(null); return }
+    api.get<Returnable>(`/purchase-returns/returnable/${poId}`).then(r => {
+      setInfo(r)
+      const defaultWh = warehouses.find(w => w.isDefault)?.id
+      setLines(Object.fromEntries(r.lines.map(l => {
+        // Prefer the default warehouse if it holds this material, else where most of it is
+        const withStock = l.stock.filter(s => s.quantity > 0).sort((a, b) => b.quantity - a.quantity)
+        const wh = withStock.find(s => s.warehouseId === defaultWh)?.warehouseId ?? withStock[0]?.warehouseId ?? ''
+        return [l.materialId, { warehouseId: wh, quantity: '', reason: '' }]
+      })))
+    }).catch(e => setErr(e.message))
+  }, [poId])
 
-  const setLine = (i: number, field: keyof LineItem, val: string | number) =>
-    setLines(prev => prev.map((l, idx) => idx === i ? { ...l, [field]: val } : l))
+  const setLine = (mid: string, k: keyof LineState, v: string) => setLines(p => ({ ...p, [mid]: { ...p[mid], [k]: v } }))
+  const total = (info?.lines ?? []).reduce((s, l) => s + (Number(lines[l.materialId]?.quantity) || 0) * l.unitPrice, 0)
 
   const save = async () => {
-    if (!supplierId)   return setErr('Select a supplier')
-    if (!poId)         return setErr('Select a purchase order')
-    if (!reason.trim()) return setErr('Reason is required')
-    const valid = lines.filter(l => l.materialId && l.warehouseId && l.quantity > 0)
-    if (!valid.length) return setErr('Add at least one item')
+    if (!poId || !info)  return setErr('Select a received purchase order')
+    if (!reason.trim())  return setErr('Reason is required')
+    const items = info.lines
+      .map(l => ({ l, st: lines[l.materialId] }))
+      .filter(({ st }) => Number(st?.quantity) > 0)
+    if (!items.length) return setErr('Enter a quantity for at least one material')
+    for (const { l, st } of items) {
+      if (Number(st.quantity) > l.returnable) return setErr(`${l.name}: only ${l.returnable} ${l.unit} can be returned`)
+      if (!st.warehouseId) return setErr(`${l.name}: choose the warehouse it is returned from`)
+      const inWh = l.stock.find(s => s.warehouseId === st.warehouseId)?.quantity ?? 0
+      if (Number(st.quantity) > inWh) return setErr(`${l.name}: only ${inWh} ${l.unit} in the selected warehouse`)
+    }
     setLoad(true)
     try {
       await api.post('/purchase-returns', {
-        poId, supplierId, reason, note: note || undefined,
-        returnDate: returnDate || undefined,
-        items: valid.map(l => ({ materialId: l.materialId, warehouseId: l.warehouseId, quantity: l.quantity, reason: l.reason || undefined })),
+        poId, reason, note: note || undefined, returnDate: returnDate || undefined,
+        items: items.map(({ l, st }) => ({ materialId: l.materialId, warehouseId: st.warehouseId, quantity: Number(st.quantity), reason: st.reason || undefined })),
       })
       onSave(); onClose()
     } catch (e: unknown) { setErr(e instanceof Error ? e.message : 'Error') }
@@ -80,9 +111,9 @@ function NewReturnModal({ suppliers, warehouses, onClose, onSave }: {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}>
-      <div style={{ background: '#fff', borderRadius: 12, padding: 28, width: 680, maxWidth: '100%', fontFamily: FONT }}>
+      <div style={{ background: '#fff', borderRadius: 12, padding: 28, width: 760, maxWidth: '100%', fontFamily: FONT }}>
         <h2 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 700, color: DARK }}>New Purchase Return</h2>
-        <p style={{ margin: '0 0 20px', fontSize: 13, color: '#64748B' }}>Return materials to a supplier. Stock is deducted immediately on save.</p>
+        <p style={{ margin: '0 0 20px', fontSize: 13, color: '#64748B' }}>Return goods received on a purchase order. You can return at most what was received and not already returned. Stock is deducted and the supplier balance reduced on save.</p>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
           <label>
@@ -115,35 +146,36 @@ function NewReturnModal({ suppliers, warehouses, onClose, onSave }: {
           </label>
         </div>
 
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: DARK, marginBottom: 8 }}>Items to Return</div>
-          <div style={{ background: '#F8FAFC', borderRadius: 8, padding: 12, border: '1px solid #E2E8F0' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 80px 1fr 28px', gap: 8, marginBottom: 8 }}>
-              {['Material', 'From Warehouse', 'Qty', 'Item Reason', ''].map(h => (
-                <span key={h} style={{ fontSize: 11, fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase' }}>{h}</span>
-              ))}
-            </div>
-            {lines.map((line, i) => (
-              <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 80px 1fr 28px', gap: 8, marginBottom: 6, alignItems: 'center' }}>
-                <select value={line.materialId} onChange={e => setLine(i, 'materialId', e.target.value)} style={inp}>
-                  <option value="">— material —</option>
-                  {materials.map(m => <option key={m.id} value={m.id}>{m.name} ({m.unit})</option>)}
-                </select>
-                <select value={line.warehouseId} onChange={e => setLine(i, 'warehouseId', e.target.value)} style={inp}>
-                  <option value="">— warehouse —</option>
-                  {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                </select>
-                <input type="number" min={1} value={line.quantity} onChange={e => setLine(i, 'quantity', Number(e.target.value))} style={inp} />
-                <input value={line.reason} onChange={e => setLine(i, 'reason', e.target.value)} placeholder="optional" style={inp} />
-                <button onClick={() => setLines(prev => prev.filter((_, idx) => idx !== i))} style={{ border: 'none', background: 'transparent', color: '#EF4444', fontSize: 18, cursor: 'pointer', padding: 0 }}>×</button>
+        {info && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: DARK, marginBottom: 8 }}>Items on {info.po.poNumber}</div>
+            <div style={{ background: '#F8FAFC', borderRadius: 8, padding: 12, border: '1px solid #E2E8F0', overflowX: 'auto' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr 1.6fr 80px 1.2fr', gap: 8, marginBottom: 8, minWidth: 620 }}>
+                {['Material', 'Returnable', 'From Warehouse', 'Qty', 'Item Reason'].map(h => (
+                  <span key={h} style={{ fontSize: 11, fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase' }}>{h}</span>
+                ))}
               </div>
-            ))}
-            <button onClick={() => setLines(prev => [...prev, { materialId: '', warehouseId: warehouses[0]?.id ?? '', quantity: 1, reason: '' }])}
-              style={{ marginTop: 4, background: 'none', border: '1px dashed #CBD5E1', borderRadius: 6, padding: '6px 14px', cursor: 'pointer', fontSize: 12, color: '#64748B', fontFamily: FONT }}>
-              + Add Item
-            </button>
+              {info.lines.map(l => {
+                const st = lines[l.materialId] ?? { warehouseId: '', quantity: '', reason: '' }
+                const over = Number(st.quantity) > l.returnable
+                return (
+                  <div key={l.materialId} style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr 1.6fr 80px 1.2fr', gap: 8, marginBottom: 6, alignItems: 'center', minWidth: 620 }}>
+                    <div style={{ fontSize: 13 }}><b>{l.name}</b><div style={{ fontSize: 11, color: '#64748B' }}>AED {l.unitPrice.toFixed(2)} / {l.unit}</div></div>
+                    <div style={{ fontSize: 12, color: l.returnable > 0 ? DARK : '#94A3B8' }}>{l.returnable} {l.unit}<div style={{ fontSize: 11, color: '#94A3B8' }}>rcvd {l.received} · ret {l.returned}</div></div>
+                    <select value={st.warehouseId} onChange={e => setLine(l.materialId, 'warehouseId', e.target.value)} style={inp} disabled={l.returnable <= 0}>
+                      <option value="">— warehouse —</option>
+                      {l.stock.map(s => <option key={s.warehouseId} value={s.warehouseId}>{s.warehouseName} ({s.quantity})</option>)}
+                    </select>
+                    <input type="number" min={0} max={l.returnable} step="any" value={st.quantity} onChange={e => setLine(l.materialId, 'quantity', e.target.value)} disabled={l.returnable <= 0}
+                      style={{ ...inp, borderColor: over ? '#EF4444' : '#E2E8F0' }} />
+                    <input value={st.reason} onChange={e => setLine(l.materialId, 'reason', e.target.value)} placeholder="optional" style={inp} disabled={l.returnable <= 0} />
+                  </div>
+                )
+              })}
+            </div>
+            {total > 0 && <div style={{ textAlign: 'right', marginTop: 8, fontSize: 14, fontWeight: 700, color: DARK }}>Return value: AED {total.toFixed(2)} <span style={{ fontWeight: 400, fontSize: 12, color: '#64748B' }}>(incl. VAT, at PO price)</span></div>}
           </div>
-        </div>
+        )}
 
         {err && <div style={{ color: '#EF4444', fontSize: 12, marginBottom: 12 }}>{err}</div>}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -156,6 +188,10 @@ function NewReturnModal({ suppliers, warehouses, onClose, onSave }: {
 }
 
 export function PurchaseReturnsPage() {
+  const { can } = useAuth()
+  const canReturn = can('feature.purchase_returns')
+  const [params, setParams] = useSearchParams()
+  const [initialPoId, setInitialPoId] = useState<string | null>(null)
   const [data,       setData]  = useState<PurchaseReturn[]>([])
   const [suppliers,  setSupp]  = useState<Supplier[]>([])
   const [warehouses, setWh]    = useState<Warehouse[]>([])
@@ -176,6 +212,12 @@ export function PurchaseReturnsPage() {
   }
   useEffect(() => { load() }, [])
 
+  // Arrived from a PO's "Return" button
+  useEffect(() => {
+    const id = params.get('poId')
+    if (id) { params.delete('poId'); setParams(params, { replace: true }); if (canReturn) { setInitialPoId(id); setNew(true) } }
+  }, [canReturn])
+
   const filtered = data.filter(r =>
     r.supplier.name.toLowerCase().includes(q.toLowerCase()) ||
     r.po.poNumber.toLowerCase().includes(q.toLowerCase()) ||
@@ -188,7 +230,8 @@ export function PurchaseReturnsPage() {
     supplier: r.supplier.name,
     items:    r._count.items,
     materials: r.items.map(i => `${i.material.name} (${i.quantity} ${i.material.unit})`).join(', '),
-    reason:   <span style={{ fontSize: 12, color: '#64748B' }}>{r.reason}</span>,
+    reason:   <span style={{ fontSize: 12, color: '#64748B' }}>{r.reason}{r.createdBy ? <span style={{ display: 'block', fontSize: 11, color: '#94A3B8' }}>by {r.createdBy}</span> : null}</span>,
+    amount:   Number(r.totalAmount ?? 0) > 0 ? `AED ${Number(r.totalAmount).toFixed(2)}` : <span style={{ color: '#CBD5E1' }}>—</span>,
     date:     r.returnDate.slice(0, 10),
   }))
 
@@ -197,6 +240,7 @@ export function PurchaseReturnsPage() {
     { key: 'poNumber',  label: 'PO #',      width: 130 },
     { key: 'supplier',  label: 'Supplier',  width: 150 },
     { key: 'materials', label: 'Materials' },
+    { key: 'amount',    label: 'Value',     width: 110 },
     { key: 'reason',    label: 'Reason',    width: 180 },
     { key: 'date',      label: 'Date',      width: 100 },
   ]
@@ -209,12 +253,13 @@ export function PurchaseReturnsPage() {
       actions={
         <div style={{ display: 'flex', gap: 8 }}>
           <SearchInput value={q} onChange={setQ} placeholder="Search supplier, PO, reason…" />
-          <Btn label="+ New Return" onClick={() => setNew(true)} />
+          {canReturn && <Btn label="+ New Return" onClick={() => setNew(true)} />}
         </div>
       }
     >
       <div style={{ background: '#FFF7ED', border: '1px solid #FED7AA', borderRadius: 10, padding: '12px 16px', marginBottom: 20, fontSize: 13, color: '#92400E', fontFamily: FONT }}>
-        <strong>How it works:</strong> Select the supplier and the received PO, add the materials being returned and which warehouse they're coming from. Stock is deducted immediately.
+        <strong>How it works:</strong> Select the supplier and the received PO, then enter how much of each material goes back and from which warehouse. You can only return what was received on that PO (minus earlier returns). Stock is deducted immediately.
+        {!canReturn && <div style={{ marginTop: 6, color: '#B91C1C' }}>You don't have permission to create purchase returns — ask the owner to grant "Can return goods from purchase orders".</div>}
       </div>
 
       <StatGrid>
@@ -231,14 +276,14 @@ export function PurchaseReturnsPage() {
             <div style={{ textAlign: 'center', padding: 60, color: '#94A3B8', fontFamily: FONT }}>
               <div style={{ fontWeight: 600, marginBottom: 6 }}>No purchase returns yet</div>
               <div style={{ fontSize: 13, marginBottom: 20 }}>Return damaged or incorrect materials back to a supplier.</div>
-              <Btn label="+ New Return" onClick={() => setNew(true)} />
+              {canReturn && <Btn label="+ New Return" onClick={() => setNew(true)} />}
             </div>
           )
           : <><div style={{ fontSize: 13, color: '#64748B', marginBottom: 12, fontFamily: FONT }}>{filtered.length} returns</div><Table columns={COLS} rows={rows} /></>
       }
 
       {showNew && (
-        <NewReturnModal suppliers={suppliers} warehouses={warehouses} onClose={() => setNew(false)} onSave={load} />
+        <NewReturnModal suppliers={suppliers} warehouses={warehouses} initialPoId={initialPoId} onClose={() => { setNew(false); setInitialPoId(null) }} onSave={load} />
       )}
     </AdminLayout>
   )

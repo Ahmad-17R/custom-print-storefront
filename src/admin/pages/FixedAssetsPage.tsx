@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AdminLayout, Table, SearchInput, Badge, StatCard, StatGrid, Btn } from '../components/AdminLayout'
 import { api } from '../../lib/api'
+import { today } from '../lib/date'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
@@ -31,7 +32,7 @@ function Modal({ item, warehouses, onClose, onSaved }: {
   const [warehouseId, setWarehouse] = useState(item?.warehouse?.id ?? '')
   const [name, setName]             = useState(item?.name ?? '')
   const [category, setCategory]     = useState(item?.category ?? '')
-  const [purchaseDate, setDate]     = useState(item?.purchaseDate ? item.purchaseDate.slice(0, 10) : '')
+  const [purchaseDate, setDate]     = useState(item?.purchaseDate ? item.purchaseDate.slice(0, 10) : (isEdit ? '' : today()))
   const [purchaseValue, setValue]   = useState(item?.purchaseValue ? String(Number(item.purchaseValue)) : '')
   const [usefulLifeYears, setLife]  = useState(item?.usefulLifeYears ? String(item.usefulLifeYears) : '')
   const [currentValue, setCurrent]  = useState(item?.currentValue ? String(Number(item.currentValue)) : '')
@@ -155,9 +156,9 @@ function DepreciationPanel({ asset, onClose, onSaved }: {
   asset: FixedAsset; onClose: () => void; onSaved: () => void
 }) {
   const monthly = monthlyDepreciation(asset)
-  const today = new Date().toISOString().slice(0, 10)
+  const todayStr = today()
   const [amount, setAmount]   = useState(monthly !== null ? String(monthly) : '')
-  const [date, setDate]       = useState(today)
+  const [date, setDate]       = useState(todayStr)
   const [notes, setNotes]     = useState('')
   const [saving, setSaving]   = useState(false)
   const [err, setErr]         = useState('')

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AdminLayout, Table, Btn, SearchInput, Badge, StatCard, StatGrid } from '../components/AdminLayout'
 import { api } from '../../lib/api'
+import { today } from '../lib/date'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
@@ -26,7 +27,7 @@ function Modal({ apr, employees, onClose, onSaved }: { apr: Appraisal | null; em
   const [score, setScore]      = useState(apr?.score ? String(Number(apr.score)) : '')
   const [rating, setRating]    = useState(apr?.rating ?? '')
   const [comments, setComments]= useState(apr?.comments ?? '')
-  const [reviewDate, setDate]  = useState(apr?.reviewDate?.slice(0, 10) ?? '')
+  const [reviewDate, setDate]  = useState(apr?.reviewDate?.slice(0, 10) ?? (isNew ? today() : ''))
   const [status, setStatus]    = useState(apr?.status ?? 'draft')
   const [saving, setSaving]    = useState(false)
   const [err, setErr]          = useState('')

@@ -9,7 +9,7 @@ interface Warehouse { id: string; name: string }
 interface Material  { id: string; name: string; unit: string }
 interface Supplier  { id: string; name: string }
 interface Movement  {
-  id: string; quantity: number; reference: string | null; note: string | null; unitCost: number | null; createdAt: string
+  id: string; quantity: number; reference: string | null; invoiceNo?: string | null; note: string | null; unitCost: number | null; createdAt: string
   material:  { id: string; name: string; unit: string }
   warehouse: { id: string; name: string }
 }
@@ -31,6 +31,7 @@ function StockInModal({ warehouses, materials, suppliers, onClose, onSave }: {
   const [materialId, setMaterial] = useState('')
   const [supplierId, setSupplier] = useState('')
   const [unitCost,   setUnitCost] = useState('')
+  const [invoiceNo,  setInvoiceNo] = useState('')
   const [note,       setNote]     = useState('')
   const [dists,      setDists]    = useState<Distribution[]>(
     warehouses.map(w => ({ warehouseId: w.id, qty: 0 }))
@@ -53,6 +54,7 @@ function StockInModal({ warehouses, materials, suppliers, onClose, onSave }: {
         materialId,
         supplierId:  supplierId || undefined,
         unitCost:    unitCost   ? Number(unitCost) : undefined,
+        invoiceNo:   invoiceNo.trim() || undefined,
         note:        note       || undefined,
         distributions: dists,
       })
@@ -86,7 +88,11 @@ function StockInModal({ warehouses, materials, suppliers, onClose, onSave }: {
             {lbl('Unit Cost (AED)')}
             <input type="number" min={0} step="0.01" value={unitCost} onChange={e => setUnitCost(e.target.value)} placeholder="0.00" style={inp} />
           </label>
-          <label style={{ gridColumn: '1/-1' }}>
+          <label>
+            {lbl('Supplier Invoice No.')}
+            <input value={invoiceNo} onChange={e => setInvoiceNo(e.target.value)} placeholder="e.g. INV-55120" style={inp} />
+          </label>
+          <label>
             {lbl('Note')}
             <input value={note} onChange={e => setNote(e.target.value)} placeholder="e.g. Purchased from trade fair, batch A" style={inp} />
           </label>
@@ -241,14 +247,15 @@ export function StockInPage() {
   const filtered = data.filter(r =>
     r.material.name.toLowerCase().includes(q.toLowerCase()) ||
     r.warehouse.name.toLowerCase().includes(q.toLowerCase()) ||
-    (r.reference ?? '').toLowerCase().includes(q.toLowerCase())
+    (r.reference ?? '').toLowerCase().includes(q.toLowerCase()) ||
+    (r.invoiceNo ?? '').toLowerCase().includes(q.toLowerCase())
   )
 
   const totalUnits = data.reduce((s, r) => s + r.quantity, 0)
   const uniqueRefs = new Set(data.map(r => r.reference)).size
 
   const rows = filtered.map(r => ({
-    ref:       <code style={{ fontSize: 12 }}>{r.reference ?? '—'}</code>,
+    ref:       <div><code style={{ fontSize: 12 }}>{r.reference ?? '—'}</code>{r.invoiceNo && <div style={{ fontSize: 11, color: '#64748B' }}>Inv {r.invoiceNo}</div>}</div>,
     material:  r.material.name,
     unit:      r.material.unit,
     warehouse: r.warehouse.name,

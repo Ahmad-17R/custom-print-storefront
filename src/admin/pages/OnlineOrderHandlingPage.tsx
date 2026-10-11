@@ -5,6 +5,7 @@ import { AdminOrderInformation, AdminOrderDetails, type AdminOrderDetail } from 
 import { api, catalogImageUrl } from '../../lib/api'
 import { TruckIcon } from '../components/icons'
 import { useAuth } from '../lib/AuthContext'
+import { OrderPortalPanel } from '../components/OrderPortalPanel'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
@@ -288,6 +289,7 @@ function OrderDrawer({ orderId, warehouses, suppliers, materials, onClose, onUpd
         </div>
         <AdminOrderInformation order={order} onUpdated={reloadAll} />
         <PaymentPanel order={order} canRecord={canRecord} onRecorded={reloadAll} />
+        <OrderPortalPanel order={order} onChanged={reloadAll} />
         <div style={{ marginTop: 24, textAlign: 'center', maxWidth: 380, margin: '24px auto 0' }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: DARK, marginBottom: 8 }}>Which warehouse is handling this order?</div>
           <div style={{ fontSize: 13, color: '#64748B', marginBottom: 20, lineHeight: 1.6 }}>Workers and materials come from the warehouse you pick. Changeable until work begins.</div>
@@ -323,6 +325,7 @@ function OrderDrawer({ orderId, warehouses, suppliers, materials, onClose, onUpd
       <AdminOrderInformation order={order} onUpdated={reloadAll} />
 
       <PaymentPanel order={order} canRecord={canRecord} onRecorded={reloadAll} />
+      <OrderPortalPanel order={order} onChanged={reloadAll} />
 
       {/* Warehouse bar */}
       <div style={{ padding: '8px 20px', borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', gap: 10, background: '#F8FAFC' }}>

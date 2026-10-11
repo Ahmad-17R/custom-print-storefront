@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AdminLayout, Table, SearchInput, Badge, StatCard, StatGrid, Btn } from '../components/AdminLayout'
 import { api } from '../../lib/api'
+import { today } from '../lib/date'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
@@ -21,7 +22,7 @@ function Modal({ item, customers, onClose, onSaved }: { item: Partial<CustomerPa
   const [customerId, setCust] = useState(item?.customerId ?? customers[0]?.id ?? '')
   const [amount, setAmount]   = useState(item?.amount ? String(Number(item.amount)) : '')
   const [method, setMethod]   = useState(item?.method ?? 'bank_transfer')
-  const [paidDate, setDate]   = useState(item?.paidDate ? item.paidDate.slice(0, 10) : new Date().toISOString().slice(0, 10))
+  const [paidDate, setDate]   = useState(item?.paidDate ? item.paidDate.slice(0, 10) : today())
   const [reference, setRef]   = useState(item?.reference ?? '')
   const [notes, setNotes]     = useState(item?.notes ?? '')
   const [saving, setSaving]   = useState(false)

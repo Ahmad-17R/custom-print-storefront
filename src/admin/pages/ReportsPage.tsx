@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { AdminLayout, Btn } from '../components/AdminLayout'
 import { api } from '../../lib/api'
+import { today, monthStart } from '../lib/date'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
@@ -265,12 +266,12 @@ function TrialBalanceReport({ from, to }: { from: string; to: string }) {
 type ReportTab = 'pl' | 'ledger' | 'trial'
 
 export function ReportsPage() {
-  const today   = new Date().toISOString().slice(0, 10)
-  const firstOfMonth = today.slice(0, 8) + '01'
+  const todayStr = today()
+  const firstOfMonth = monthStart()
 
   const [tab,  setTab]  = useState<ReportTab>('pl')
   const [from, setFrom] = useState(firstOfMonth)
-  const [to,   setTo]   = useState(today)
+  const [to,   setTo]   = useState(todayStr)
 
   const tabs: { key: ReportTab; label: string }[] = [
     { key: 'pl',     label: 'Profit & Loss' },
@@ -310,8 +311,8 @@ export function ReportsPage() {
         </label>
         <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
           {[
-            { label: 'This Month', f: firstOfMonth, t: today },
-            { label: 'This Year',  f: today.slice(0, 4) + '-01-01', t: today },
+            { label: 'This Month', f: firstOfMonth, t: todayStr },
+            { label: 'This Year',  f: todayStr.slice(0, 4) + '-01-01', t: todayStr },
             { label: 'All Time',   f: '', t: '' },
           ].map(p => (
             <button key={p.label} onClick={() => { setFrom(p.f); setTo(p.t) }}

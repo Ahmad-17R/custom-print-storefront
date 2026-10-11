@@ -97,6 +97,10 @@ export function SettingsPage() {
               <input style={inputStyle} value={s.corporateTaxNumber ?? ''} onChange={e => setSetting('corporateTaxNumber', e.target.value)} placeholder="e.g. CT1234567890" />
             </label>
             <label style={{ display: 'block', marginBottom: 14 }}>
+              <span style={labelStyle}>Corporate Tax Number</span>
+              <input style={inputStyle} value={s.corporateTaxNumber ?? ''} onChange={e => setSetting('corporateTaxNumber', e.target.value)} placeholder="UAE Corporate Tax registration no." />
+            </label>
+            <label style={{ display: 'block', marginBottom: 14 }}>
               <span style={labelStyle}>Address</span>
               <textarea style={{ ...inputStyle, minHeight: 64, resize: 'vertical' }} value={s.address ?? ''} onChange={e => setSetting('address', e.target.value)} placeholder="Unit 14, Al Quoz Industrial Area 2, Dubai, UAE" />
             </label>
@@ -122,8 +126,8 @@ export function SettingsPage() {
               </select>
             </label>
             <label style={{ display: 'block', marginBottom: 14 }}>
-              <span style={labelStyle}>VAT Rate (%)</span>
-              <input type="number" style={inputStyle} value={s.vatRate ?? '5'} onChange={e => setSetting('vatRate', e.target.value)} />
+              <span style={labelStyle}>VAT</span>
+              <a href="/admin/tax-rates" style={{ display: 'block', ...inputStyle, color: '#1D4ED8', textDecoration: 'none', background: '#F8FAFC' }}>VAT on/off, inclusive / exclusive prices and the rate → Finance › Tax Rates</a>
             </label>
             <label style={{ display: 'block', marginBottom: 14 }}>
               <span style={labelStyle}>Fiscal Year Start</span>
@@ -134,6 +138,11 @@ export function SettingsPage() {
             <label style={{ display: 'block', marginBottom: 14 }}>
               <span style={labelStyle}>Payment Terms (days)</span>
               <input type="number" style={inputStyle} value={s.paymentTerms ?? '30'} onChange={e => setSetting('paymentTerms', e.target.value)} />
+            </label>
+            <label style={{ display: 'block', marginBottom: 14 }}>
+              <span style={labelStyle}>Invoices Issued By (legal name)</span>
+              <input style={inputStyle} value={s.invoiceIssuerName ?? 'AL Waqar'} onChange={e => setSetting('invoiceIssuerName', e.target.value)} placeholder="AL Waqar" />
+              <span style={{ fontSize: 11, color: '#94A3B8' }}>Printed on every online, walk-in and POS invoice with the VAT / TRN number above.</span>
             </label>
             <label style={{ display: 'block', marginBottom: 14 }}>
               <span style={labelStyle}>Invoice Prefix</span>

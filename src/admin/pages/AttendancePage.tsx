@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AdminLayout, Table, Btn, SearchInput, Badge, StatCard, StatGrid } from '../components/AdminLayout'
 import { api } from '../../lib/api'
+import { today } from '../lib/date'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
@@ -33,7 +34,7 @@ interface ModalProps {
 
 function Modal({ rec, employees, onClose, onSaved }: ModalProps) {
   const [employeeId, setEmp]  = useState(rec?.employee.id ?? '')
-  const [date, setDate]       = useState(rec?.date?.slice(0, 10) ?? new Date().toISOString().slice(0, 10))
+  const [date, setDate]       = useState(rec?.date?.slice(0, 10) ?? today())
   const [status, setStatus]   = useState(rec?.status ?? 'present')
   const [checkIn, setIn]      = useState(rec?.checkIn ? new Date(rec.checkIn).toTimeString().slice(0, 5) : '')
   const [checkOut, setOut]    = useState(rec?.checkOut ? new Date(rec.checkOut).toTimeString().slice(0, 5) : '')
