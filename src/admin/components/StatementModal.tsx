@@ -55,7 +55,13 @@ export function StatementModal({ kind, id, name, onClose }: { kind: 'supplier' |
 
   const csv = () => {
     if (!st) return
-    const cell = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
+    // Names/notes come from customers — stop Excel running text like "=HYPERLINK(…)" as a formula
+    // (plain numbers such as "-55.00" are left as numbers)
+    const cell = (v: unknown) => {
+      let s = String(v ?? '')
+      if (/^[=+\-@\t\r]/.test(s) && !/^-?\d+(\.\d+)?$/.test(s)) s = `'${s}`
+      return `"${s.replace(/"/g, '""')}"`
+    }
     const rows = [
       [`${kind === 'supplier' ? 'Supplier' : 'Customer'} statement`, st.party.name, 'TRN', st.party.trn ?? ''],
       ['Period', `${from} to ${to}`, 'Issued by', `${st.company.name} (TRN ${st.company.trn ?? '-'})`],
