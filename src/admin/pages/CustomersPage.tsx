@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
-import { AdminLayout, Table, SearchInput, Badge, StatCard, StatGrid } from '../components/AdminLayout'
+import { AdminLayout, Table, SearchInput, Badge, StatCard, StatGrid, Btn } from '../components/AdminLayout'
 import { api } from '../../lib/api'
 import { CustomerHistoryDrawer } from '../components/CustomerHistory'
 import { allPhones } from '../components/PhoneList'
+import { CustomerModal, DetailDrawer, type WalkInCustomerFull } from './WalkInCustomersPage'
+import { CUSTOMER_TABS } from '../lib/customerTabs'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 
@@ -16,6 +18,7 @@ interface OnlineCustomer {
 interface WalkInCustomer {
   id: string; name: string; phone: string | null; phones?: string[]; email: string | null
   company: string | null; createdAt: string
+  group?: { id: string; name: string } | null
   _count?: { sales?: number }
 }
 
@@ -31,9 +34,10 @@ const COLS = [
   { key: 'email',   label: 'Email',   width: 200 },
   { key: 'company', label: 'Company', width: 160 },
   { key: 'phone',   label: 'Phone',   width: 130 },
-  { key: 'ctype',   label: 'Customer type', width: 150 },
+  { key: 'ctype',   label: 'Price group', width: 150 },
   { key: 'orders',  label: 'Orders',  width: 80  },
   { key: 'joined',  label: 'Joined',  width: 110 },
+  { key: 'edit',    label: '',        width: 70  },
 ]
 
 export function CustomersPage() {
@@ -43,11 +47,19 @@ export function CustomersPage() {
   const [typeFilter, setType] = useState<'all' | 'Online' | 'Walk-in'>('all')
   const [viewing, setViewing] = useState<UnifiedCustomer | null>(null)
   const [groups, setGroups]   = useState<{ id: string; name: string; isActive?: boolean }[]>([])
+  const [showNew, setShowNew] = useState(false)
+  const [editing, setEditing] = useState<WalkInCustomerFull | null>(null)
+  const [manage, setManage]   = useState<WalkInCustomerFull | null>(null)
   useEffect(() => { api.get<{ data: { id: string; name: string; isActive?: boolean }[] } | { id: string; name: string; isActive?: boolean }[]>('/customer-groups').then(r => setGroups(Array.isArray(r) ? r : r.data)).catch(() => {}) }, [])
-  // Online accounts get the same customer-type special rates as walk-in customers
+  // Online accounts and walk-in customers share the same customer-type special rates.
   const setGroup = async (c: UnifiedCustomer, groupId: string) => {
-    try { await api.patch(`/customers/${c.id}`, { groupId: groupId || null }); setData(d => d.map(x => x.id === c.id && x.type === c.type ? { ...x, groupId } : x)) }
+    const path = c.type === 'Online' ? `/customers/${c.id}` : `/walk-in-customers/${c.id}`
+    try { await api.patch(path, { groupId: groupId || null }); setData(d => d.map(x => x.id === c.id && x.type === c.type ? { ...x, groupId } : x)) }
     catch (e) { alert(e instanceof Error ? e.message : 'Could not save') }
+  }
+  const openManage = async (id: string) => {
+    try { setManage(await api.get<WalkInCustomerFull>(`/walk-in-customers/${id}`)) }
+    catch (e) { alert(e instanceof Error ? e.message : 'Could not load customer') }
   }
 
   const load = async () => {
@@ -80,6 +92,7 @@ export function CustomersPage() {
         orders:  c._count?.sales ?? 0,
         isActive: true,
         joined:  c.createdAt.slice(0, 10),
+        groupId: c.group?.id ?? null,
       }))
 
       setData([...online, ...walkIn].sort((a, b) => b.joined.localeCompare(a.joined)))
@@ -104,17 +117,18 @@ export function CustomersPage() {
     email:   c.email !== '—' ? c.email : <span style={{ color: '#94A3B8', fontSize: 12 }}>—</span>,
     company: c.company !== '—' ? c.company : <span style={{ color: '#94A3B8', fontSize: 12 }}>—</span>,
     phone:   c.phone !== '—' ? c.phone : <span style={{ color: '#94A3B8', fontSize: 12 }}>—</span>,
-    ctype:   c.type === 'Online'
-      ? <div onClick={e => e.stopPropagation()}>
+    ctype:   <div onClick={e => e.stopPropagation()}>
           <select value={c.groupId ?? ''} onChange={e => setGroup(c, e.target.value)} style={{ fontSize: 12, padding: '3px 6px', border: '1px solid #E2E8F0', borderRadius: 6, fontFamily: FONT, maxWidth: 140 }}>
             <option value="">Standard</option>
             {groups.filter(g => g.isActive !== false || g.id === c.groupId).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
           </select>
           {!!c.members && <div style={{ fontSize: 10, color: '#7C3AED', marginTop: 2 }}>{c.members} authorised user{c.members === 1 ? '' : 's'}</div>}
-        </div>
-      : <span style={{ color: '#94A3B8', fontSize: 12 }}>set in Walk-in Customers</span>,
+        </div>,
     orders:  c.orders,
     joined:  c.joined,
+    edit:    c.type === 'Walk-in'
+      ? <div onClick={e => e.stopPropagation()}><button onClick={() => openManage(c.id)} style={{ fontSize: 12, padding: '4px 10px', border: '1px solid #CBD5E1', borderRadius: 6, background: '#fff', cursor: 'pointer', fontFamily: FONT }}>Manage</button></div>
+      : <span style={{ color: '#CBD5E1', fontSize: 11 }}>portal</span>,
   }))
 
   const online  = data.filter(c => c.type === 'Online').length
@@ -122,7 +136,7 @@ export function CustomersPage() {
   const withOrders = data.filter(c => c.orders > 0).length
 
   return (
-    <AdminLayout title="All Customers" actions={<SearchInput value={q} onChange={setQ} placeholder="Search name, email, company…" />}>
+    <AdminLayout title="Customers" tabs={CUSTOMER_TABS} actions={<div style={{ display: 'flex', gap: 8 }}><SearchInput value={q} onChange={setQ} placeholder="Search name, email, company…" /><Btn label="+ New Customer" onClick={() => setShowNew(true)} /></div>}>
       <StatGrid>
         <StatCard label="Total"     value={String(data.length)} sub="All customers" />
         <StatCard label="Online"    value={String(online)}      sub="Storefront accounts" color="#8B5CF6" />
@@ -151,6 +165,9 @@ export function CustomersPage() {
       {viewing && (
         <CustomerHistoryDrawer type={viewing.type === 'Online' ? 'online' : 'walk_in'} id={viewing.id} name={viewing.name} onClose={() => setViewing(null)} />
       )}
+      {showNew && <CustomerModal onClose={() => setShowNew(false)} onSave={() => { setShowNew(false); load() }} />}
+      {editing && <CustomerModal initial={editing} onClose={() => setEditing(null)} onSave={() => { setEditing(null); load(); if (manage && editing.id === manage.id) openManage(manage.id) }} />}
+      {manage && !editing && <DetailDrawer customer={manage} onClose={() => setManage(null)} onEdit={() => setEditing(manage)} onRefresh={load} />}
     </AdminLayout>
   )
 }

@@ -11,7 +11,7 @@ interface CustomerType { id: string; name: string; discountPercent: string; isAc
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
 
-interface Customer {
+export interface WalkInCustomerFull {
   id: string; name: string; phone: string | null; phones?: string[]; email: string | null
   company: string | null; trn: string | null; corporateTaxNumber: string | null; notes: string | null; tags: string[]
   isActive: boolean; createdAt: string
@@ -20,13 +20,14 @@ interface Customer {
   group?: { id: string; name: string; discountPercent: string } | null
 }
 interface Note { id: string; content: string; createdAt: string }
-interface CustomerDetail extends Customer { noteLog: Note[] }
+export interface WalkInAddr { id: string; label: string; line1: string; line2: string | null; city: string; emirate: string; country: string; isDefault: boolean }
+interface CustomerDetail extends WalkInCustomerFull { noteLog: Note[]; addresses?: WalkInAddr[]; portalAccount?: { id: string; email: string; isActive: boolean } | null }
 
 const inp: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 13, fontFamily: FONT, boxSizing: 'border-box', outline: 'none' }
 const lbl = (t: string) => <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 4 }}>{t}</span>
 
 // ── New / Edit Customer Modal ─────────────────────────────────────────────────
-function CustomerModal({ initial, onClose, onSave }: { initial?: Customer; onClose: () => void; onSave: () => void }) {
+export function CustomerModal({ initial, onClose, onSave }: { initial?: WalkInCustomerFull; onClose: () => void; onSave: () => void }) {
   const [name,    setName]    = useState(initial?.name    ?? '')
   const [phone,   setPhone]   = useState(initial?.phone   ?? '')
   const [phones,  setPhones]  = useState<string[]>(initial?.phones ?? [])
@@ -71,7 +72,7 @@ function CustomerModal({ initial, onClose, onSave }: { initial?: Customer; onClo
           <label style={{ gridColumn: '1/-1' }}>{lbl('Company / Business')}<input value={company} onChange={e => setCompany(e.target.value)} style={inp} /></label>
           <label>{lbl('TRN (Tax Reg. No.)')}<input value={trn} maxLength={15} onChange={e => setTrn(e.target.value)} style={inp} placeholder="15 characters" /></label>
           <label>{lbl('Corporate Tax No.')}<input value={corporateTaxNumber} onChange={e => setCorporateTaxNumber(e.target.value)} style={inp} /></label>
-          <label>{lbl('Customer type / special rates')}
+          <label>{lbl('Price group / special rates')}
             <select value={groupId} onChange={e => setGroupId(e.target.value)} style={inp}>
               <option value="">Regular customer (catalogue prices)</option>
               {types.filter(t => t.isActive || t.id === groupId).map(t => <option key={t.id} value={t.id}>{t.name}{Number(t.discountPercent) > 0 ? ` — ${Number(t.discountPercent)}% off` : ''}</option>)}
@@ -109,7 +110,123 @@ function CustomerModal({ initial, onClose, onSave }: { initial?: Customer; onClo
 }
 
 // ── Customer Detail Drawer ────────────────────────────────────────────────────
-function DetailDrawer({ customer, onClose, onEdit, onRefresh }: { customer: Customer; onClose: () => void; onEdit: () => void; onRefresh: () => void }) {
+// Saved delivery addresses for a walk-in customer — add / edit / default / delete.
+function AddressManager({ customerId, addresses, onChanged }: { customerId: string; addresses: WalkInAddr[]; onChanged: () => void }) {
+  const blank = { label: 'Address', line1: '', line2: '', city: '', emirate: 'Dubai', isDefault: false }
+  const [editing, setEditing] = useState<WalkInAddr | null>(null)
+  const [adding, setAdding] = useState(false)
+  const [form, setForm] = useState(blank)
+  const [err, setErr] = useState('')
+  const open = (a?: WalkInAddr) => { if (a) { setEditing(a); setForm({ label: a.label, line1: a.line1, line2: a.line2 ?? '', city: a.city, emirate: a.emirate, isDefault: a.isDefault }) } else { setEditing(null); setForm(blank) } setAdding(true); setErr('') }
+  const save = async () => {
+    if (!form.line1.trim() || !form.city.trim() || !form.emirate.trim()) return setErr('Address, city and emirate are required')
+    try {
+      if (editing) await api.patch(`/walk-in-customers/${customerId}/addresses/${editing.id}`, form)
+      else await api.post(`/walk-in-customers/${customerId}/addresses`, form)
+      setAdding(false); onChanged()
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Could not save') }
+  }
+  const remove = async (id: string) => { if (confirm('Delete this address?')) { await api.delete(`/walk-in-customers/${customerId}/addresses/${id}`); onChanged() } }
+  const setDefault = async (a: WalkInAddr) => { await api.patch(`/walk-in-customers/${customerId}/addresses/${a.id}`, { isDefault: true }); onChanged() }
+
+  return (
+    <div>
+      {addresses.length === 0 && !adding && <div style={{ fontSize: 12, color: '#94A3B8', marginBottom: 8 }}>No saved addresses yet.</div>}
+      {addresses.map(a => (
+        <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, background: '#F8FAFC', borderRadius: 8, padding: '8px 12px', marginBottom: 6 }}>
+          <div style={{ fontSize: 12.5, color: DARK }}>
+            <b>{a.label}</b>{a.isDefault && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: '#047857', background: '#ECFDF5', padding: '1px 6px', borderRadius: 999 }}>Default</span>}
+            <div style={{ color: '#64748B' }}>{a.line1}{a.line2 ? `, ${a.line2}` : ''}, {a.city}, {a.emirate}, {a.country}</div>
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+            {!a.isDefault && <button onClick={() => setDefault(a)} style={{ fontSize: 11, border: '1px solid #CBD5E1', borderRadius: 6, background: '#fff', padding: '3px 8px', cursor: 'pointer' }}>Set default</button>}
+            <button onClick={() => open(a)} style={{ fontSize: 11, border: '1px solid #CBD5E1', borderRadius: 6, background: '#fff', padding: '3px 8px', cursor: 'pointer' }}>Edit</button>
+            <button onClick={() => remove(a.id)} style={{ fontSize: 11, border: '1px solid #FCA5A5', color: '#DC2626', borderRadius: 6, background: '#fff', padding: '3px 8px', cursor: 'pointer' }}>×</button>
+          </div>
+        </div>
+      ))}
+      {adding ? (
+        <div style={{ border: '1px solid #E2E8F0', borderRadius: 8, padding: 12, marginTop: 6 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <label style={{ gridColumn: '1/-1' }}>{lbl('Label')}<input value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} style={inp} placeholder="e.g. Office, Warehouse" /></label>
+            <label style={{ gridColumn: '1/-1' }}>{lbl('Address line 1 *')}<input value={form.line1} onChange={e => setForm(f => ({ ...f, line1: e.target.value }))} style={inp} /></label>
+            <label style={{ gridColumn: '1/-1' }}>{lbl('Address line 2')}<input value={form.line2} onChange={e => setForm(f => ({ ...f, line2: e.target.value }))} style={inp} /></label>
+            <label>{lbl('City *')}<input value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} style={inp} /></label>
+            <label>{lbl('Emirate *')}<input value={form.emirate} onChange={e => setForm(f => ({ ...f, emirate: e.target.value }))} style={inp} /></label>
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, margin: '8px 0', color: '#64748B' }}><input type="checkbox" checked={form.isDefault} onChange={e => setForm(f => ({ ...f, isDefault: e.target.checked }))} /> Set as default address</label>
+          {err && <div style={{ color: '#EF4444', fontSize: 12, marginBottom: 6 }}>{err}</div>}
+          <div style={{ display: 'flex', gap: 6 }}>
+            <Btn label={editing ? 'Save' : 'Add'} onClick={save} />
+            <Btn label="Cancel" variant="secondary" onClick={() => setAdding(false)} />
+          </div>
+        </div>
+      ) : <button onClick={() => open()} style={{ background: 'none', border: '1px dashed #CBD5E1', borderRadius: 6, padding: '6px 14px', cursor: 'pointer', fontSize: 12, color: '#64748B', fontFamily: FONT }}>+ Add address</button>}
+    </div>
+  )
+}
+
+// Give a walk-in customer a login to the same portal/dashboard (reuses the online portal,
+// stays labelled walk-in). Staff/owner can open the account's dashboard too.
+const CUSTOMER_SESSION_KEY = 'inkora_local_customer_session'
+function PortalAccountSection({ customerId, account, defaultEmail, onChanged }: { customerId: string; account?: { id: string; email: string } | null; defaultEmail?: string | null; onChanged: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [email, setEmail] = useState(defaultEmail ?? '')
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const [created, setCreated] = useState<{ email: string; password?: string } | null>(null)
+
+  const create = async () => {
+    setBusy(true); setErr('')
+    try {
+      const r = await api.post<{ account: { email: string }; password?: string }>(`/walk-in-customers/${customerId}/account`, { email: email.trim() || undefined, password: password.trim() || undefined })
+      setCreated({ email: r.account.email, password: r.password }); setOpen(false); onChanged()
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Could not create account') } finally { setBusy(false) }
+  }
+  const openDashboard = async () => {
+    setBusy(true); setErr('')
+    try {
+      const session = await api.post(`/walk-in-customers/${customerId}/account/token`, {})
+      localStorage.setItem(CUSTOMER_SESSION_KEY, JSON.stringify(session))
+      window.open('/account', '_blank')
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Could not open dashboard') } finally { setBusy(false) }
+  }
+
+  if (account || created) {
+    const email2 = account?.email ?? created?.email
+    return (
+      <div style={{ background: '#F0FDF4', border: '1px solid #A7F3D0', borderRadius: 8, padding: '10px 12px' }}>
+        <div style={{ fontSize: 12.5, color: '#065F46' }}>Portal account: <b>{email2}</b></div>
+        {created?.password && <div style={{ fontSize: 12, color: '#92400E', background: '#FFFBEB', borderRadius: 6, padding: '6px 10px', marginTop: 6 }}>Temporary password: <b>{created.password}</b> — share it with the customer (shown once).</div>}
+        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+          <Btn label={busy ? '…' : 'Open dashboard'} onClick={openDashboard} />
+        </div>
+        {err && <div style={{ color: '#DC2626', fontSize: 12, marginTop: 6 }}>{err}</div>}
+      </div>
+    )
+  }
+  return (
+    <div>
+      {!open
+        ? <button onClick={() => setOpen(true)} style={{ background: 'none', border: '1px dashed #CBD5E1', borderRadius: 6, padding: '6px 14px', cursor: 'pointer', fontSize: 12, color: '#64748B', fontFamily: FONT }}>+ Create portal account</button>
+        : (
+          <div style={{ border: '1px solid #E2E8F0', borderRadius: 8, padding: 12 }}>
+            <div style={{ fontSize: 12, color: '#64748B', marginBottom: 8 }}>Gives this customer a login to the same dashboard (orders, addresses, TRN, invoices, statements).</div>
+            <label style={{ display: 'block', marginBottom: 8 }}>{lbl('Login email *')}<input value={email} onChange={e => setEmail(e.target.value)} style={inp} placeholder="customer@email.com" /></label>
+            <label style={{ display: 'block', marginBottom: 8 }}>{lbl('Password (leave blank to auto-generate)')}<input value={password} onChange={e => setPassword(e.target.value)} style={inp} placeholder="min 6 characters" /></label>
+            {err && <div style={{ color: '#EF4444', fontSize: 12, marginBottom: 6 }}>{err}</div>}
+            <div style={{ display: 'flex', gap: 6 }}>
+              <Btn label={busy ? 'Creating…' : 'Create account'} onClick={create} />
+              <Btn label="Cancel" variant="secondary" onClick={() => setOpen(false)} />
+            </div>
+          </div>
+        )}
+    </div>
+  )
+}
+
+export function DetailDrawer({ customer, onClose, onEdit, onRefresh }: { customer: WalkInCustomerFull; onClose: () => void; onEdit: () => void; onRefresh: () => void }) {
   const [detail,  setDetail]  = useState<CustomerDetail | null>(null)
   const [note,    setNote]    = useState('')
   const [addNote, setAddNote] = useState(false)
@@ -169,6 +286,20 @@ function DetailDrawer({ customer, onClose, onEdit, onRefresh }: { customer: Cust
           </div>
         )}
 
+        {/* Saved delivery addresses */}
+        <div style={{ fontWeight: 700, fontSize: 13, color: DARK, margin: '4px 0 10px' }}>Delivery Addresses</div>
+        <div style={{ marginBottom: 20 }}>
+          <AddressManager customerId={customer.id} addresses={detail?.addresses ?? []}
+            onChanged={() => api.get<CustomerDetail>(`/walk-in-customers/${customer.id}`).then(setDetail)} />
+        </div>
+
+        {/* Portal account (same dashboard as online customers) */}
+        <div style={{ fontWeight: 700, fontSize: 13, color: DARK, margin: '4px 0 10px' }}>Customer Account &amp; Dashboard</div>
+        <div style={{ marginBottom: 20 }}>
+          <PortalAccountSection customerId={customer.id} account={detail?.portalAccount} defaultEmail={customer.email}
+            onChanged={() => { api.get<CustomerDetail>(`/walk-in-customers/${customer.id}`).then(setDetail); onRefresh() }} />
+        </div>
+
         {/* Full history: walk-in + online orders, payments, balance, deposits, quotations */}
         <div style={{ fontWeight: 700, fontSize: 13, color: DARK, marginBottom: 10 }}>Order History</div>
         <CustomerHistoryPanel walkInCustomerId={customer.id} reloadKey={historyKey} onRecordDeposit={() => setDepositOpen(true)} />
@@ -205,17 +336,17 @@ function DetailDrawer({ customer, onClose, onEdit, onRefresh }: { customer: Cust
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export function WalkInCustomersPage() {
-  const [data,    setData]    = useState<Customer[]>([])
+  const [data,    setData]    = useState<WalkInCustomerFull[]>([])
   const [loading, setLoad]    = useState(true)
   const [q,       setQ]       = useState('')
   const [showNew, setNew]     = useState(false)
-  const [editing, setEditing] = useState<Customer | null>(null)
-  const [viewing, setViewing] = useState<Customer | null>(null)
+  const [editing, setEditing] = useState<WalkInCustomerFull | null>(null)
+  const [viewing, setViewing] = useState<WalkInCustomerFull | null>(null)
   const [deposit, setDeposit] = useState(false)
 
   const load = async () => {
     setLoad(true)
-    try { setData((await api.get<{ data: Customer[] }>('/walk-in-customers?pageSize=200')).data) }
+    try { setData((await api.get<{ data: WalkInCustomerFull[] }>('/walk-in-customers?pageSize=200')).data) }
     finally { setLoad(false) }
   }
   useEffect(() => { load() }, [])

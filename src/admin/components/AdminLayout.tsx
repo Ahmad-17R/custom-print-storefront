@@ -76,7 +76,6 @@ const NAV_GROUPS = [
       { label: 'Order Handling',  href: '/admin/online-order-handling' },
       { label: 'Order Summary',   href: '/admin/online-order-summary' },
       { label: 'Shipments',       href: '/admin/shipments' },
-      { label: 'Sales Invoices',  href: '/admin/sales-invoices' },
       { label: 'Credit Notes',    href: '/admin/credit-notes' },
     ],
   },
@@ -106,11 +105,16 @@ const NAV_GROUPS = [
     ],
   },
   {
+    id: 'customers', label: 'Customers', icon: 'crm',
+    items: [
+      { label: 'Directory',     href: '/admin/customers' },
+      { label: 'Price Groups',  href: '/admin/customer-groups' },
+      { label: 'Quotations',    href: '/admin/quotations' },
+    ],
+  },
+  {
     id: 'sales', label: 'Sales & CRM', icon: 'sales',
     items: [
-      { label: 'Customers',     href: '/admin/walk-in-customers' },
-      { label: 'Customer Types', href: '/admin/customer-groups' },
-      { label: 'Quotations',    href: '/admin/quotations' },
       { label: 'Walk-in Sales', href: '/admin/walk-in-sales' },
       { label: 'Order Handling', href: '/admin/order-handling' },
       { label: 'Order Summary', href: '/admin/order-summary' },
@@ -174,7 +178,6 @@ const NAV_GROUPS = [
     items: [
       { label: 'Users & Roles',     href: '/admin/users' },
       { label: 'Countries',         href: '/admin/countries' },
-      { label: 'Customers',         href: '/admin/customers' },
       { label: 'Audit Trail',       href: '/admin/audit' },
       { label: 'Webhooks',          href: '/admin/webhooks' },
       { label: 'Email Templates',   href: '/admin/email-templates' },
@@ -507,9 +510,10 @@ function TopBar({ title, actions, onMenuClick }: { title: string; actions?: Reac
 }
 
 // ── Layout export ─────────────────────────────────────────────────────────────
-export function AdminLayout({ title, actions, children }: {
+export function AdminLayout({ title, actions, tabs, children }: {
   title: string
   actions?: React.ReactNode
+  tabs?: { label: string; href: string }[]
   children: React.ReactNode
 }) {
   const isMobile = useIsMobile()
@@ -569,6 +573,16 @@ export function AdminLayout({ title, actions, children }: {
         {isMobile && actions && (
           <div style={{ padding: '8px 16px', background: '#fff', borderBottom: '1px solid #E2E8F0', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {actions}
+          </div>
+        )}
+        {tabs && tabs.length > 0 && (
+          <div style={{ display: 'flex', gap: 4, padding: '0 16px', background: '#fff', borderBottom: '1px solid #E2E8F0', overflowX: 'auto' }}>
+            {tabs.map(t => {
+              const active = location.pathname === t.href || location.pathname.startsWith(t.href + '/')
+              return (
+                <Link key={t.href} to={t.href} style={{ padding: '11px 16px', fontSize: 13, fontFamily: font, fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap', color: active ? '#0F172A' : '#64748B', borderBottom: active ? '2px solid #1D4ED8' : '2px solid transparent', marginBottom: -1 }}>{t.label}</Link>
+              )
+            })}
           </div>
         )}
         <main style={{ flex: 1, padding: isMobile ? 12 : 24, overflowY: 'auto' }}>

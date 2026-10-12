@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { AdminLayout, Table, SearchInput, Badge, StatCard, StatGrid } from '../components/AdminLayout'
 import { api, catalogImageUrl } from '../../lib/api'
 import { useAuth } from '../lib/AuthContext'
-import { PrinterIcon, PencilIcon, PinIcon, BulbIcon, CheckIcon } from '../components/icons'
+import { PrinterIcon, PencilIcon, PinIcon, BulbIcon, CheckIcon, InvoiceIcon } from '../components/icons'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
@@ -77,6 +77,7 @@ function buildLabelHtml(s: Shipment): string {
   html, body { margin: 0 }
   body { font-family: 'Poppins', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif; color: #0F172A; background: #fff }
   .label { width: 100mm; height: 150mm; display: flex; flex-direction: column; border: 1px solid #0F172A; overflow: hidden }
+  .head, .strip, .foot { flex: 0 0 auto }
   /* header */
   .head { background: #0F172A; color: #fff; padding: 4.5mm 6mm; display: flex; justify-content: space-between; align-items: center }
   .brand { font-size: 15px; font-weight: 800; letter-spacing: .3px }
@@ -91,7 +92,7 @@ function buildLabelHtml(s: Shipment): string {
   .k { font-size: 8px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #94A3B8 }
   .v { font-size: 12px; font-weight: 700; margin-top: 1px }
   /* body */
-  .body { flex: 1; padding: 4.5mm 6mm; display: flex; flex-direction: column }
+  .body { flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 4.5mm 6mm; display: flex; flex-direction: column }
   .cap { font-size: 8.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: #94A3B8 }
   .name { font-size: 21px; font-weight: 800; line-height: 1.05; margin-top: 1.5mm }
   .phone { font-size: 15px; font-weight: 700; margin-top: 1mm; letter-spacing: .3px }
@@ -100,9 +101,9 @@ function buildLabelHtml(s: Shipment): string {
   .instr .ic { font-size: 15px; line-height: 1 }
   .instr .tx { font-size: 12.5px; font-weight: 600; line-height: 1.35; color: #422006 }
   .instr .cap { color: #92400E; margin-bottom: 1mm }
-  .art { margin-top: 3.5mm; flex: 1; min-height: 18mm; border: 1px solid #E5E7EB; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 10px; overflow: hidden; background: #F8FAFC }
+  .art { margin-top: 3.5mm; flex: 1 1 auto; min-height: 0; border: 1px solid #E5E7EB; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 10px; overflow: hidden; background: #F8FAFC }
   .art.empty { border-style: dashed }
-  .art img { width: 100%; height: 100%; object-fit: contain }
+  .art img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain }
   .art .cap { position: absolute; margin: 1.5mm }
   .artwrap { position: relative; flex: 1; display: flex; margin-top: 3.5mm }
   .pdf { font-size: 11px; font-weight: 700; color: #DC2626 }
@@ -435,6 +436,7 @@ export function ShipmentsPage() {
     action: (
       <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
         <button style={{ ...btn('ghost'), padding: '5px 10px', fontSize: 12 }} onClick={() => printLabel(r)} title="Print parcel label"><PrinterIcon /> Label</button>
+        {r.order && <button style={{ ...btn('ghost'), padding: '5px 10px', fontSize: 12 }} onClick={() => navigate(`/admin/invoice/${r.order!.id}`)} title="Print the tax invoice"><InvoiceIcon /> Invoice</button>}
         {canEdit && <button style={{ ...btn('ghost'), padding: '5px 10px', fontSize: 12 }} onClick={() => setEditing(r)} title="Edit shipment"><PencilIcon /> Edit</button>}
         {isActive(r)
           ? <button style={{ ...btn('success'), padding: '5px 12px', fontSize: 12 }} disabled={busyId === r.id} onClick={() => markDelivered(r.id)}>{busyId === r.id ? '…' : 'Mark Delivered'}</button>
@@ -475,7 +477,7 @@ export function ShipmentsPage() {
             { key: 'order', label: 'Order', width: 150 }, { key: 'customer', label: 'Customer' },
             { key: 'carrier', label: 'Carrier / Rider', width: 170 }, { key: 'route', label: 'Route', width: 190 },
             { key: 'price', label: 'Price', width: 110 }, { key: 'status', label: 'Status', width: 140 },
-            { key: 'action', label: '', width: 280 },
+            { key: 'action', label: '', width: 360 },
           ]} rows={rows} />}
 
       {showNew && <ShipmentModal carriers={carriers} routes={routes} initialOrderId={newOrderId || undefined} onClose={closeNew} onSaved={() => { closeNew(); load() }} />}

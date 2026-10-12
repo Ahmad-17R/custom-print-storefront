@@ -7,12 +7,13 @@ export interface AdminOrderDetail {
   paymentReference?: string | null; subtotal: string | number; vatAmount: string | number
   deliveryFee: string | number; total: string | number; amountPaid?: string | number; requiresDeposit?: boolean; notes?: string | null; createdAt: string
   designFileUrl?: string | null; designFileName?: string | null
+  proofStatus?: string | null
   payments?: Array<{ id: string; amount: string | number; type: string; method: string; note?: string | null; paidAt: string; recordedBy?: { id: string; name: string } | null }>
   contactName?: string | null; contactEmail?: string | null; contactPhone?: string | null
   deliveryLine1?: string | null; deliveryLine2?: string | null; deliveryCity?: string | null
   deliveryEmirate?: string | null; deliveryCountry?: string | null; deliveryNotes?: string | null
   handlingWarehouseId?: string | null
-  customer?: { id?: string; fullName?: string | null; email?: string | null; phone?: string | null }
+  customer?: { id?: string; fullName?: string | null; email?: string | null; phone?: string | null; trn?: string | null; corporateTaxNumber?: string | null }
   items: Array<{
     id: string; productId: string; productName: string; quantity: number; unitPrice: string | number
     total: string | number; note?: string | null

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { AdminLayout, Table, SearchInput, Badge, StatCard, StatGrid } from '../components/AdminLayout'
 import { AdminOrderDetails, type AdminOrderDetail } from '../components/AdminOrderDetails'
+import { InvoiceIcon } from '../components/icons'
 import { api } from '../../lib/api'
 
 const money = (v: string | number) => `AED ${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
@@ -11,7 +13,7 @@ const columns = [
   { key: 'total', label: 'Total', width: 120 },
   { key: 'payment', label: 'Payment', width: 120 },
   { key: 'delivered', label: 'Delivered', width: 120 },
-  { key: 'actions', label: '', width: 80 },
+  { key: 'actions', label: '', width: 180 },
 ]
 
 // Completed online orders — delivered jobs, off the handling board.
@@ -20,6 +22,7 @@ export function OnlineOrderSummaryPage() {
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
   const [selectedId, setSelectedId] = useState('')
+  const navigate = useNavigate()
 
   const load = async () => {
     setLoading(true)
@@ -39,7 +42,12 @@ export function OnlineOrderSummaryPage() {
     total: money(o.total),
     payment: <span style={{ textTransform: 'capitalize', color: o.paymentStatus === 'paid' ? '#047857' : '#D97706' }}>{o.paymentStatus.replaceAll('_', ' ')}</span>,
     delivered: <Badge label="Delivered" color="#047857" />,
-    actions: <button onClick={() => setSelectedId(o.id)} style={{ fontSize: 12, padding: '5px 10px', border: '1px solid #CBD5E1', borderRadius: 6, background: '#fff', cursor: 'pointer' }}>View</button>,
+    actions: (
+      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+        <button onClick={() => navigate(`/admin/invoice/${o.id}`)} title="Print the tax invoice" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, padding: '5px 10px', border: '1px solid #CBD5E1', borderRadius: 6, background: '#fff', cursor: 'pointer' }}><InvoiceIcon /> Invoice</button>
+        <button onClick={() => setSelectedId(o.id)} style={{ fontSize: 12, padding: '5px 10px', border: '1px solid #CBD5E1', borderRadius: 6, background: '#fff', cursor: 'pointer' }}>View</button>
+      </div>
+    ),
   }))
 
   return <AdminLayout title="Order Summary (Online)" actions={<SearchInput value={q} onChange={setQ} placeholder="Search order or customer…" />}>

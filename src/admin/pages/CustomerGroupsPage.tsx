@@ -1,3 +1,4 @@
+import { CUSTOMER_TABS } from '../lib/customerTabs'
 import React, { useEffect, useState } from 'react'
 import { AdminLayout, Table, Btn, Badge, StatCard, StatGrid } from '../components/AdminLayout'
 import { api } from '../../lib/api'
@@ -36,7 +37,7 @@ function GroupModal({ group, onClose, onSaved }: { group: Group | null; onClose:
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ background: '#fff', borderRadius: 12, padding: 26, width: 440, maxWidth: '100%', fontFamily: FONT }}>
-        <h2 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700, color: DARK }}>{group ? 'Edit Customer Type' : 'New Customer Type'}</h2>
+        <h2 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700, color: DARK }}>{group ? 'Edit Price Group' : 'New Price Group'}</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <label>{lbl('Name *')}<input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Freelancer, Corporate, VIP" style={inp} /></label>
           <label>{lbl('Discount on catalogue prices (%)')}<input type="number" min={0} max={99} step="0.5" value={discount} onChange={e => setDiscount(e.target.value)} style={inp} />
@@ -53,7 +54,7 @@ function GroupModal({ group, onClose, onSaved }: { group: Group | null; onClose:
   )
 }
 
-// Special per-product prices for one customer type
+// Special per-product prices for one price group
 function PricesPanel({ group, products, onChanged }: { group: Group; products: Product[]; onChanged: () => void }) {
   const [productId, setProductId] = useState('')
   const [price, setPrice] = useState('')
@@ -115,7 +116,7 @@ export function CustomerGroupsPage() {
 
   const toggle = async (g: Group) => { await api.patch(`/customer-groups/${g.id}`, { isActive: !g.isActive }); load() }
   const remove = async (g: Group) => {
-    if (!confirm(`Delete customer type "${g.name}"?`)) return
+    if (!confirm(`Delete price group "${g.name}"?`)) return
     try { await api.delete(`/customer-groups/${g.id}`); load() } catch (e: unknown) { alert(e instanceof Error ? e.message : 'Error') }
   }
 
@@ -138,19 +139,19 @@ export function CustomerGroupsPage() {
   const open = data.find(g => g.id === openId)
 
   return (
-    <AdminLayout title="Customer Types & Special Rates" actions={<Btn label="+ New Customer Type" onClick={() => setModal({ group: null })} />}>
+    <AdminLayout title="Price Groups & Special Rates" tabs={CUSTOMER_TABS} actions={<Btn label="+ New Price Group" onClick={() => setModal({ group: null })} />}>
       <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 10, padding: '12px 16px', marginBottom: 20, fontSize: 13, color: '#14532D', fontFamily: FONT }}>
         Give special customers (e.g. daily freelancers) lower rates: set a <b>discount %</b> for the type and/or a <b>special price</b> per product, then pick the type on the customer (Customers → Edit). Their prices fill in automatically on walk-in sales, quotations and the POS — staff can still adjust.
       </div>
       <StatGrid>
-        <StatCard label="Customer Types" value={String(data.length)} sub={`${data.filter(g => g.isActive).length} active`} />
+        <StatCard label="Price Groups" value={String(data.length)} sub={`${data.filter(g => g.isActive).length} active`} />
         <StatCard label="Customers"      value={String(data.reduce((s, g) => s + g._count.customers, 0))} sub="On a special rate" color="#10B981" />
         <StatCard label="Special Prices" value={String(data.reduce((s, g) => s + g.prices.length, 0))} sub="Product-level rates" color="#7C3AED" />
       </StatGrid>
       {loading ? <div style={{ padding: 40, textAlign: 'center', color: '#94A3B8', fontFamily: FONT }}>Loading…</div>
-        : data.length === 0 ? <div style={{ padding: 60, textAlign: 'center', color: '#94A3B8', fontFamily: FONT }}>No customer types yet.<div style={{ marginTop: 16 }}><Btn label="+ New Customer Type" onClick={() => setModal({ group: null })} /></div></div>
+        : data.length === 0 ? <div style={{ padding: 60, textAlign: 'center', color: '#94A3B8', fontFamily: FONT }}>No price groups yet.<div style={{ marginTop: 16 }}><Btn label="+ New Price Group" onClick={() => setModal({ group: null })} /></div></div>
         : <Table columns={[
-            { key: 'name', label: 'Customer Type' }, { key: 'discount', label: 'Discount', width: 110 },
+            { key: 'name', label: 'Price Group' }, { key: 'discount', label: 'Discount', width: 110 },
             { key: 'prices', label: 'Special Prices', width: 130 }, { key: 'customers', label: 'Customers', width: 100 },
             { key: 'status', label: 'Status', width: 100 }, { key: 'actions', label: '', width: 320 },
           ]} rows={rows} />}

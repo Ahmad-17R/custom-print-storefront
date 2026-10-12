@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { AdminLayout, StatCard, StatGrid, Badge } from '../components/AdminLayout'
 import { AdminOrderInformation, AdminOrderDetails, type AdminOrderDetail } from '../components/AdminOrderDetails'
 import { api, catalogImageUrl } from '../../lib/api'
-import { TruckIcon } from '../components/icons'
+import { TruckIcon, InvoiceIcon } from '../components/icons'
 import { useAuth } from '../lib/AuthContext'
 import { OrderPortalPanel } from '../components/OrderPortalPanel'
 
@@ -12,6 +12,24 @@ const DARK = '#0F172A'
 const BLUE = '#3B82F6'
 const fmt = (n: number) => Number(n).toLocaleString(undefined, { minimumFractionDigits: 2 })
 const digits = (s?: string | null) => (s ?? '').replace(/[^\d]/g, '')
+
+// Soft guards (UAE: COD is valid, so warn + confirm rather than hard-block).
+type GuardOrder = { orderNumber: string; total: string | number; amountPaid?: string | number | null; proofStatus?: string | null }
+const balanceOf = (o: GuardOrder) => Math.round((Number(o.total) - Number(o.amountPaid ?? 0)) * 100) / 100
+function confirmShip(o: GuardOrder): boolean {
+  const bal = balanceOf(o)
+  const proofPending = o.proofStatus === 'sent' || o.proofStatus === 'changes_requested'
+  const w: string[] = []
+  if (proofPending) w.push('• The artwork proof is NOT approved yet.')
+  if (bal > 0.009) w.push(`• Balance of AED ${bal.toFixed(2)} is still due — ship as COD (collect on delivery)?`)
+  if (!w.length) return true
+  return window.confirm(`Create shipment for ${o.orderNumber}?\n\n${w.join('\n')}\n\nContinue anyway?`)
+}
+function confirmDeliver(o: GuardOrder): boolean {
+  const bal = balanceOf(o)
+  if (bal <= 0.009) return true
+  return window.confirm(`Mark ${o.orderNumber} delivered?\n\nBalance of AED ${bal.toFixed(2)} is still due. If this was collected on delivery, record the payment afterwards.\n\nMark delivered anyway?`)
+}
 
 const HANDLING = ['confirmed', 'in_production', 'ready', 'out_for_delivery'] as const
 const S_LABEL: Record<string, string> = { confirmed: 'Confirmed', in_production: 'In Production', ready: 'Ready', out_for_delivery: 'Out for Delivery', delivered: 'Delivered', cancelled: 'Cancelled', pending: 'Pending' }
@@ -264,7 +282,7 @@ function OrderDrawer({ orderId, warehouses, suppliers, materials, onClose, onUpd
     try { await api.patch(`/orders/${orderId}/handling-warehouse`, { warehouseId }); await reloadAll() }
     catch (e: any) { setErr(e?.message ?? 'Could not set warehouse') } finally { setSaving(false) }
   }
-  const markDelivered = async () => { await api.patch(`/orders/${orderId}/status`, { status: 'delivered' }); await reloadAll() }
+  const markDelivered = async () => { if (order && !confirmDeliver(order as GuardOrder)) return; await api.patch(`/orders/${orderId}/status`, { status: 'delivered' }); await reloadAll() }
 
   const shell = (body: React.ReactNode) => (
     <>
@@ -283,9 +301,12 @@ function OrderDrawer({ orderId, warehouses, suppliers, materials, onClose, onUpd
   if (!order.handlingWarehouseId) {
     return shell(
       <div style={{ padding: 28 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 10 }}>
           <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: DARK }}>{order.orderNumber}</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#94A3B8' }}>×</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button onClick={() => navigate(`/admin/invoice/${orderId}`)} title="Open the tax invoice for this order" style={{ background: '#fff', color: DARK, border: '1px solid #CBD5E1', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}><InvoiceIcon /> Print Invoice</button>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#94A3B8' }}>×</button>
+          </div>
         </div>
         <AdminOrderInformation order={order} onUpdated={reloadAll} />
         <PaymentPanel order={order} canRecord={canRecord} onRecorded={reloadAll} />
@@ -311,7 +332,10 @@ function OrderDrawer({ orderId, warehouses, suppliers, materials, onClose, onUpd
           <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: DARK }}>{order.orderNumber}</h2>
           <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>{order.customer?.fullName ?? order.customer?.email ?? 'Online customer'}</div>
         </div>
-        <button onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 24, cursor: 'pointer', color: '#94A3B8' }}>×</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button onClick={() => navigate(`/admin/invoice/${orderId}`)} title="Open the tax invoice for this order" style={{ background: '#fff', color: DARK, border: '1px solid #CBD5E1', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}><InvoiceIcon /> Print Invoice</button>
+          <button onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 24, cursor: 'pointer', color: '#94A3B8' }}>×</button>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', borderBottom: '1px solid #F1F5F9' }}>
@@ -339,7 +363,7 @@ function OrderDrawer({ orderId, warehouses, suppliers, materials, onClose, onUpd
       {order.status !== 'delivered' && order.status !== 'cancelled' && (
         <div style={{ padding: '10px 20px', borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           {order.status === 'ready' && (
-            <button onClick={() => navigate(`/admin/shipments?newOrder=${orderId}`)} title="Create a shipment for this order"
+            <button onClick={() => { if (confirmShip(order as GuardOrder)) navigate(`/admin/shipments?newOrder=${orderId}`) }} title="Create a shipment for this order"
               style={{ background: '#059669', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 18px', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <TruckIcon /> Create Shipment →
             </button>
@@ -443,9 +467,10 @@ export function OnlineOrderHandlingPage() {
                     <div style={{ fontSize: 13, fontWeight: 700, color: DARK }}>AED {fmt(Number(o.total))}</div>
                     {(Number(o.total) - Number(o.amountPaid ?? 0)) > 0.001 && Number(o.amountPaid ?? 0) > 0 && <div style={{ fontSize: 10, color: '#DC2626', fontWeight: 600 }}>Bal AED {fmt(Number(o.total) - Number(o.amountPaid ?? 0))}</div>}
                   </div>
+                  <button onClick={() => navigate(`/admin/invoice/${o.id}`)} title="Print the tax invoice" style={{ background: '#fff', color: DARK, border: '1px solid #CBD5E1', borderRadius: 8, padding: '7px 12px', fontSize: 12, fontWeight: 600, fontFamily: FONT, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}><InvoiceIcon /> Invoice</button>
                   <button onClick={() => openView(o.id)} style={{ background: '#fff', color: DARK, border: '1px solid #CBD5E1', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 600, fontFamily: FONT, cursor: 'pointer' }}>View</button>
                   {o.status === 'ready'
-                    ? <button onClick={() => navigate(`/admin/shipments?newOrder=${o.id}`)} title="Create a shipment for this order" style={{ background: '#059669', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 700, fontFamily: FONT, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}><TruckIcon /> Ship →</button>
+                    ? <button onClick={() => { if (confirmShip(o as GuardOrder)) navigate(`/admin/shipments?newOrder=${o.id}`) }} title="Create a shipment for this order" style={{ background: '#059669', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 700, fontFamily: FONT, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}><TruckIcon /> Ship →</button>
                     : total > 0
                       ? <button onClick={() => openDrawer(o.id)} style={{ background: DARK, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 700, fontFamily: FONT, cursor: 'pointer' }}>Order Handling →</button>
                       : <span title="No production jobs — set the status from View" style={{ fontSize: 11, color: '#94A3B8', fontFamily: FONT, minWidth: 110, textAlign: 'center' }}>No jobs · set status in View</span>}

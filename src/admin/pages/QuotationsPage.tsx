@@ -1,3 +1,4 @@
+import { CUSTOMER_TABS } from '../lib/customerTabs'
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AdminLayout, Table, Btn, SearchInput, Badge, StatCard, StatGrid } from '../components/AdminLayout'
@@ -279,7 +280,7 @@ export function QuotationsPage() {
   const won  = data.filter(r => r.status === 'accepted')
 
   return (
-    <AdminLayout title="Quotations" actions={<div style={{ display: 'flex', gap: 8 }}><SearchInput value={q} onChange={setQ} placeholder="Search customer, quote #…" /><Btn label="+ New Quotation" onClick={() => setModal({ editing: null })} /></div>}>
+    <AdminLayout title="Quotations" tabs={CUSTOMER_TABS} actions={<div style={{ display: 'flex', gap: 8 }}><SearchInput value={q} onChange={setQ} placeholder="Search customer, quote #…" /><Btn label="+ New Quotation" onClick={() => setModal({ editing: null })} /></div>}>
       <StatGrid>
         <StatCard label="Open Value"   value={`AED ${money(open.reduce((s, r) => s + Number(r.total), 0))}`} sub={`${open.length} draft / sent`} color="#1D4ED8" />
         <StatCard label="Sent"         value={String(data.filter(r => r.status === 'sent').length)}     sub="Awaiting response" color="#8B5CF6" />

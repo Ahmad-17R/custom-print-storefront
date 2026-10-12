@@ -38,6 +38,41 @@ const inp: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '
 const lbl = (t: string) => <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 4 }}>{t}</span>
 const fmt = (n: any) => Number(n).toFixed(2)
 
+// Payment methods + the extra fields each one captures (UAE-common set).
+type MethodField = { key: string; label: string; type?: string; maxLength?: number; placeholder?: string }
+const PAY_METHODS: { value: string; label: string; fields: MethodField[] }[] = [
+  { value: 'cash',          label: 'Cash',                     fields: [] },
+  { value: 'card',          label: 'Card (Credit/Debit)',      fields: [{ key: 'last4', label: 'Card last 4 digits', maxLength: 4, placeholder: '1234' }, { key: 'authCode', label: 'Approval / auth code' }] },
+  { value: 'bank_transfer', label: 'Bank Transfer',            fields: [{ key: 'reference', label: 'Transfer reference' }, { key: 'bankName', label: 'Bank name' }] },
+  { value: 'cheque',        label: 'Cheque',                   fields: [{ key: 'chequeNo', label: 'Cheque number' }, { key: 'bankName', label: 'Bank name' }, { key: 'chequeDate', label: 'Cheque date', type: 'date' }] },
+  { value: 'gift_card',     label: 'Gift Card / Store Credit', fields: [{ key: 'cardCode', label: 'Gift card / voucher code' }] },
+  { value: 'apple_pay',     label: 'Apple Pay',                fields: [{ key: 'reference', label: 'Transaction ref (optional)' }] },
+  { value: 'google_pay',    label: 'Google Pay',               fields: [{ key: 'reference', label: 'Transaction ref (optional)' }] },
+  { value: 'samsung_pay',   label: 'Samsung Pay',              fields: [{ key: 'reference', label: 'Transaction ref (optional)' }] },
+]
+const methodLabel = (v: string) => PAY_METHODS.find(m => m.value === v)?.label ?? v.replace(/_/g, ' ')
+const MethodOptions = () => <>{PAY_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}</>
+
+// Conditional inputs for the selected method; writes into a details object.
+function MethodFields({ method, details, onChange }: { method: string; details: Record<string, string>; onChange: (d: Record<string, string>) => void }) {
+  const fields = PAY_METHODS.find(m => m.value === method)?.fields ?? []
+  if (!fields.length) return null
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: fields.length > 1 ? '1fr 1fr' : '1fr', gap: 10, marginTop: 10, padding: 10, background: '#F8FAFC', borderRadius: 8 }}>
+      {fields.map(f => (
+        <label key={f.key} style={{ gridColumn: f.type === 'date' ? '1/-1' : undefined }}>{lbl(f.label)}
+          <input type={f.type ?? 'text'} maxLength={f.maxLength} value={details[f.key] ?? ''} placeholder={f.placeholder}
+            onChange={e => onChange({ ...details, [f.key]: e.target.value })} style={inp} />
+        </label>
+      ))}
+    </div>
+  )
+}
+const cleanDetails = (d: Record<string, string>) => {
+  const e = Object.fromEntries(Object.entries(d).map(([k, v]) => [k, (v ?? '').trim()]).filter(([, v]) => v))
+  return Object.keys(e).length ? e : undefined
+}
+
 // ── Interfaces ────────────────────────────────────────────────────────────────
 export interface Customer { id: string; name: string; phone?: string; email?: string; company?: string }
 export interface Product { id: string; name: string; basePrice?: number | string }
@@ -46,7 +81,7 @@ export interface Material { id: string; name: string; unit: string }
 
 interface SaleFieldValue { id: string; fieldLabel: string; displayValue: string; priceModifier: string | number }
 interface SaleItem { id: string; productId: string; productName: string; quantity: number; unitPrice: number; total: number; customization?: string; product?: Product; fieldValues?: SaleFieldValue[] }
-interface Payment  { id: string; amount: number; type: string; method: string; note?: string; paidAt: string; recordedBy?: { name: string } | null }
+interface Payment  { id: string; amount: number; type: string; method: string; methodDetails?: Record<string, string> | null; note?: string; paidAt: string; recordedBy?: { name: string } | null }
 interface JobMaterial { id: string; name: string; materialId?: string; quantity: number; unitCost: number; totalCost: number; note?: string }
 interface Job {
   id: string; stepName: string; status: string; sortOrder: number
@@ -247,6 +282,7 @@ function NewSaleModal({ customers, products, onClose, onSaved }: {
   const [dueDate,    setDue]      = useState('')
   const [advAmt,     setAdv]      = useState('')
   const [advMethod,  setAdvM]     = useState('cash')
+  const [advDetails, setAdvDetails] = useState<Record<string, string>>({})
   const [items,      setItems]    = useState<{ productId: string; quantity: number; unitPrice: number; basePrice: number; customization: string; selections: Record<string, string | string[]> }[]>([])
   const [discount,   setDiscount] = useState('')
   const [err,        setErr]      = useState('')
@@ -307,7 +343,7 @@ function NewSaleModal({ customers, products, onClose, onSaved }: {
         productId: i.productId, quantity: i.quantity, unitPrice: i.unitPrice, customization: i.customization,
         selections: Object.entries(i.selections).filter(([, v]) => v != null && v !== '' && !(Array.isArray(v) && v.length === 0)).map(([fieldId, value]) => ({ fieldId, value })),
       }))
-      const sale = await api.post<{ id: string }>('/walk-in-sales', { customerId, note, dueDate, advanceAmount: advance, advanceMethod: advMethod, discount: canDiscount ? discountVal : 0, items: payload })
+      const sale = await api.post<{ id: string }>('/walk-in-sales', { customerId, note, dueDate, advanceAmount: advance, advanceMethod: advMethod, advanceDetails: advance > 0 ? cleanDetails(advDetails) : undefined, discount: canDiscount ? discountVal : 0, items: payload })
       if (creditUse > 0 && credit) {
         try { await applyCredit(sale.id, credit.open, creditUse) }
         catch (e: any) { alert(`Order created, but the deposit could not be applied: ${e.message ?? e}. Apply it from the order.`) }
@@ -399,13 +435,12 @@ function NewSaleModal({ customers, products, onClose, onSaved }: {
               <input type="number" min={0} step="0.01" value={advAmt} onChange={e => setAdv(e.target.value)} placeholder="0.00" style={inp} />
             </label>
             <label>{lbl('Method')}
-              <select value={advMethod} onChange={e => setAdvM(e.target.value)} style={inp}>
-                <option value="cash">Cash</option>
-                <option value="card">Card</option>
-                <option value="bank_transfer">Bank Transfer</option>
+              <select value={advMethod} onChange={e => { setAdvM(e.target.value); setAdvDetails({}) }} style={inp}>
+                <MethodOptions />
               </select>
             </label>
           </div>
+          {Number(advAmt) > 0 && <MethodFields method={advMethod} details={advDetails} onChange={setAdvDetails} />}
         </div>
 
         {/* Summary */}
@@ -433,6 +468,7 @@ function PaymentModal({ sale, onClose, onSaved }: { sale: Sale; onClose: () => v
   const [amount, setAmount] = useState(String(Math.max(0, balance).toFixed(2)))
   const [type,   setType]   = useState('balance')
   const [method, setMethod] = useState('cash')
+  const [details, setDetails] = useState<Record<string, string>>({})
   const [note,   setNote]   = useState('')
   const [err,    setErr]    = useState('')
   const [saving, setSaving] = useState(false)
@@ -442,7 +478,7 @@ function PaymentModal({ sale, onClose, onSaved }: { sale: Sale; onClose: () => v
     if (!amt || amt <= 0) return setErr('Enter a valid amount')
     setSaving(true)
     try {
-      await api.post(`/walk-in-sales/${sale.id}/payments`, { amount: amt, type, method, note })
+      await api.post(`/walk-in-sales/${sale.id}/payments`, { amount: amt, type, method, methodDetails: cleanDetails(details), note })
       onSaved(); onClose()
     } catch (e: any) { setErr(e.message ?? 'Error') }
     finally { setSaving(false) }
@@ -476,13 +512,12 @@ function PaymentModal({ sale, onClose, onSaved }: { sale: Sale; onClose: () => v
               </select>
             </label>
             <label>{lbl('Method')}
-              <select value={method} onChange={e => setMethod(e.target.value)} style={inp}>
-                <option value="cash">Cash</option>
-                <option value="card">Card</option>
-                <option value="bank_transfer">Bank Transfer</option>
+              <select value={method} onChange={e => { setMethod(e.target.value); setDetails({}) }} style={inp}>
+                <MethodOptions />
               </select>
             </label>
           </div>
+          <MethodFields method={method} details={details} onChange={setDetails} />
           <label>{lbl('Note')}<input value={note} onChange={e => setNote(e.target.value)} placeholder="Optional note…" style={inp} /></label>
         </div>
         {err && <div style={{ color: '#EF4444', fontSize: 12, marginBottom: 10 }}>{err}</div>}
@@ -1312,7 +1347,8 @@ export function SaleDrawer({ saleId, suppliers, materials, products, warehouses,
               {sale.payments.map(p => (
                 <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#F8FAFC', borderRadius: 10, marginBottom: 8 }}>
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: DARK, textTransform: 'capitalize' }}>{p.type} · {p.method.replace('_', ' ')}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: DARK, textTransform: 'capitalize' }}>{p.type} · {methodLabel(p.method)}</div>
+                    {p.methodDetails && Object.keys(p.methodDetails).length > 0 && <div style={{ fontSize: 11, color: '#64748B' }}>{Object.entries(p.methodDetails).map(([k, v]) => `${k.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase())}: ${v}`).join(' · ')}</div>}
                     {p.note && <div style={{ fontSize: 11, color: '#64748B' }}>{p.note}</div>}
                     <div style={{ fontSize: 11, color: '#94A3B8' }}>{new Date(p.paidAt).toLocaleDateString()}{p.recordedBy ? ` · by ${p.recordedBy.name}` : ''}</div>
                   </div>

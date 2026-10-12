@@ -39,7 +39,16 @@ export function OrderPortalPanel({ order, onChanged }: { order: ProofInfo; onCha
     if (!text.trim()) return
     try { await api.post(`/orders/${order.id}/messages`, { body: text.trim() }); setText(''); load() } catch (e) { setErr(e instanceof Error ? e.message : 'Failed') }
   }
+  // Staff record the customer's decision on their behalf (e.g. approved over phone/WhatsApp).
+  const decide = async (status: 'approved' | 'changes_requested') => {
+    const comment = status === 'changes_requested' ? (window.prompt('What changes did the customer ask for?') ?? '').trim() : ''
+    if (status === 'changes_requested' && !comment) return
+    setBusy(true); setErr('')
+    try { await api.post(`/orders/${order.id}/proof/status`, { status, comment }); onChanged(); load() }
+    catch (e) { setErr(e instanceof Error ? e.message : 'Failed') } finally { setBusy(false) }
+  }
   const st = order.proofStatus ? PROOF[order.proofStatus] : null
+  const canDecide = order.proofStatus === 'sent' || order.proofStatus === 'changes_requested'
 
   return (
     <div style={{ padding: '14px 20px', borderBottom: '1px solid #F1F5F9', fontFamily: "'Poppins', system-ui, sans-serif" }}>
@@ -55,6 +64,13 @@ export function OrderPortalPanel({ order, onChanged }: { order: ProofInfo; onCha
         <button disabled={busy} onClick={() => fileRef.current?.click()} style={{ padding: '7px 12px', borderRadius: 7, border: 'none', background: DARK, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{busy ? 'Sending…' : order.proofStatus ? 'Send new proof' : 'Send proof'}</button>
         <input ref={fileRef} type="file" hidden accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={e => { const f = e.target.files?.[0]; if (f) sendProof(f); e.target.value = '' }} />
       </div>
+      {canDecide && (
+        <div style={{ display: 'flex', gap: 6, marginTop: 8, alignItems: 'center' }}>
+          <span style={{ fontSize: 11, color: '#94A3B8' }}>Customer replied offline?</span>
+          <button disabled={busy} onClick={() => decide('approved')} style={{ padding: '5px 11px', borderRadius: 7, border: '1px solid #A7F3D0', background: '#ECFDF5', color: '#059669', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>✓ Mark approved</button>
+          <button disabled={busy} onClick={() => decide('changes_requested')} style={{ padding: '5px 11px', borderRadius: 7, border: '1px solid #FED7AA', background: '#FFF7ED', color: '#EA580C', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Request changes</button>
+        </div>
+      )}
 
       <div style={{ fontSize: 13, fontWeight: 700, color: DARK, margin: '16px 0 8px' }}>Messages with customer</div>
       <div style={{ maxHeight: 220, overflowY: 'auto', display: 'grid', gap: 6, marginBottom: 8 }}>
