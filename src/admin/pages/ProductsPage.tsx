@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AdminLayout, Table, Btn, SearchInput, Badge, StatCard, StatGrid } from '../components/AdminLayout'
-import { api } from '../../lib/api'
+import { api, API_ORIGIN } from '../../lib/api'
 import { TEMPLATES } from '../../shared/components/product-editor/templates'
 
 const FONT = "'Poppins', system-ui, sans-serif"
 const DARK = '#0F172A'
-const API_BASE = 'http://localhost:4000'
+const API_BASE = API_ORIGIN
 
 interface Product { id: string; name: string; slug: string; brandId: string; categoryId: string; basePrice: number; editorTemplate?: string | null; isActive: boolean; variantCount: number; createdAt: string }
 // Derived from the real editor templates so every available design (all business-card

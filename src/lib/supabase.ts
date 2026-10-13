@@ -1,4 +1,5 @@
 import { createClient, type Session } from '@supabase/supabase-js'
+import { API_ORIGIN } from './api'
 
 const supabaseUrl  = import.meta.env.VITE_SUPABASE_URL  as string
 const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY as string
@@ -10,7 +11,7 @@ const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 // Set VITE_LOCAL_AUTH=false (or remove it) to go back to Supabase.
 export const LOCAL_AUTH = import.meta.env.VITE_LOCAL_AUTH === 'true'
 
-const LOCAL_API = 'http://localhost:4000/customer/auth/local'
+const LOCAL_API = `${API_ORIGIN}/customer/auth/local`
 const STORE_KEY = 'inkora_local_customer_session'
 type Listener = (event: string, session: Session | null) => void
 const listeners = new Set<Listener>()

@@ -1,4 +1,6 @@
-const BASE = 'http://localhost:4000/api/v1'
+// Backend origin: VITE_API_URL in production (e.g. https://custom-print-api.onrender.com), localhost in dev
+const ORIGIN = ((import.meta.env.VITE_API_URL as string | undefined) || 'http://localhost:4000').replace(/\/+$/, '').replace(/\/api\/v1$/, '')
+const BASE = `${ORIGIN}/api/v1`
 
 const TOKEN_KEY = 'inkora_admin_token'
 export const getToken = () => localStorage.getItem(TOKEN_KEY)
@@ -68,7 +70,7 @@ export const issueOrderCreditNote = (orderId: string, reason?: string) =>
 // ── Public storefront catalog ──────────────────────────────────────────────────
 // Served under /customer (NOT /api/v1) and public — so no Authorization header.
 // NOTE: Prisma serialises Decimal as a JSON string → basePrice is a string; Number() it.
-export const API_ORIGIN = 'http://localhost:4000'
+export const API_ORIGIN = ORIGIN
 const CUSTOMER_BASE = `${API_ORIGIN}/customer`
 
 export interface CatalogImage { id: string; url: string; altText: string | null; sortOrder: number; isMain: boolean }
@@ -264,7 +266,7 @@ export interface AuthEmployee {
   posRegisterId?: string | null; posRegisterName?: string | null
 }
 
-const AUTH_BASE = 'http://localhost:4000/employee/auth'
+const AUTH_BASE = `${ORIGIN}/employee/auth`
 
 export async function loginInternal(identifier: string, password: string): Promise<{ token: string; employee: AuthEmployee }> {
   const isEmail = identifier.includes('@')
