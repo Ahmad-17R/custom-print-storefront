@@ -41,7 +41,7 @@ export function TeamTab({ token, me }: { token: string; me: PortalWhoami }) {
   const pending = requests.filter(r => r.status === 'pending')
 
   return (
-    <div style={{ display: 'grid', gap: 18 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 18 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ fontSize: 24, margin: 0 }}>{isOwner ? 'Team & authorised users' : 'My order approvals'}</h1>
@@ -211,12 +211,12 @@ export function BillingTab({ token }: { token: string }) {
 
   if (err) return <div style={{ ...card, color: '#B91C1C' }}>{err}</div>
   return (
-    <div style={{ display: 'grid', gap: 18 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 18 }}>
       <h1 style={{ fontSize: 24, margin: 0 }}>Invoices & statement</h1>
       <div style={card}>
         <h2 style={{ fontSize: 16, margin: '0 0 12px' }}>Tax invoices</h2>
         {invoices.length === 0 ? <div style={{ color: '#94A3B8', fontSize: 14 }}>No invoices yet — an invoice is issued when an order is confirmed.</div>
-          : <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          : <div className="stor-table-scroll"><table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead><tr style={{ color: '#64748B', textAlign: 'left' }}><th style={{ padding: 6 }}>Number</th><th>Date</th><th>Order</th><th>Payment</th><th style={{ textAlign: 'right' }}>Amount</th><th /></tr></thead>
               <tbody>{invoices.map(i => (
                 <tr key={i.id} style={{ borderTop: '1px solid #F1F5F9' }}>
@@ -228,7 +228,7 @@ export function BillingTab({ token }: { token: string }) {
                   <td style={{ textAlign: 'right' }}><button style={small()} onClick={() => print(i.id)}>Print / PDF</button></td>
                 </tr>
               ))}</tbody>
-            </table>}
+            </table></div>}
       </div>
       <div style={card}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -240,7 +240,7 @@ export function BillingTab({ token }: { token: string }) {
           </div>
         </div>
         {!st ? <div style={{ color: '#94A3B8' }}>Loading…</div> : <>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <div className="stor-table-scroll"><table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead><tr style={{ color: '#64748B', textAlign: 'left' }}><th style={{ padding: 6 }}>Date</th><th>Reference</th><th>Description</th><th style={{ textAlign: 'right' }}>Invoiced</th><th style={{ textAlign: 'right' }}>Paid / credited</th><th style={{ textAlign: 'right' }}>Balance</th></tr></thead>
             <tbody>
               <tr style={{ borderTop: '1px solid #F1F5F9', color: '#64748B' }}><td style={{ padding: 8 }} colSpan={5}>Opening balance</td><td style={{ textAlign: 'right' }}>{money(st.opening)}</td></tr>
@@ -253,7 +253,7 @@ export function BillingTab({ token }: { token: string }) {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 20, marginTop: 12, fontSize: 14 }}>
             <span>Invoiced <b>{money(st.totals.debit)}</b></span><span>Paid <b style={{ color: '#059669' }}>{money(st.totals.credit)}</b></span>
             <span>{st.closing >= 0 ? 'You owe' : 'Your credit'} <b style={{ color: st.closing > 0 ? '#DC2626' : '#059669' }}>{money(Math.abs(st.closing))}</b></span>
@@ -276,7 +276,7 @@ export function QuotesTab({ token }: { token: string }) {
   const act = async (fn: () => Promise<unknown>, ok: string) => { setMsg(''); try { await fn(); setMsg(ok); load() } catch (e) { setMsg(errText(e)) } }
 
   return (
-    <div style={{ display: 'grid', gap: 18 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 18 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div><h1 style={{ fontSize: 24, margin: 0 }}>Quotes</h1><p style={{ color: '#64748B', margin: '4px 0 0', fontSize: 14 }}>Need a bulk or custom job? Request a quote — we price it and you accept it here.</p></div>
         <button style={btn()} onClick={() => setOpen(true)}>+ Request a quote</button>

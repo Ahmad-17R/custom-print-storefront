@@ -67,9 +67,9 @@ export function AccountPage() {
 
   return (
     <div className="storefront-order-flow" style={{ minHeight: '100vh', background: '#F1F5F9', fontFamily: 'system-ui' }}>
-      <div style={{ maxWidth: 1120, margin: '0 auto', padding: '28px 20px', display: 'grid', gridTemplateColumns: 'minmax(0, 240px) 1fr', gap: 24, alignItems: 'start' }}>
+      <div className="stor-account-layout" style={{ maxWidth: 1120, margin: '0 auto', padding: '28px 20px' }}>
         {/* Sidebar */}
-        <aside style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 14, padding: 16, position: 'sticky', top: 20 }}>
+        <aside className="stor-account-nav" style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 14, padding: 16, position: 'sticky', top: 20 }}>
           <div style={{ display: 'flex', gap: 11, alignItems: 'center', padding: '4px 6px 14px', borderBottom: '1px solid #F1F5F9', marginBottom: 10 }}>
             <span style={{ width: 42, height: 42, borderRadius: '50%', background: BLUE, color: '#fff', fontSize: 18, fontWeight: 700, display: 'grid', placeItems: 'center' }}>{initials}</span>
             <div style={{ minWidth: 0 }}>
@@ -101,7 +101,7 @@ export function AccountPage() {
             : tab === 'team' && me ? <TeamTab token={token!} me={me} />
             : tab === 'orders'    ? <OrdersTab orders={orders} />
             : tab === 'addresses' && profile ? <AddressesTab token={token!} profile={profile} onChange={setProfile} />
-            : tab === 'profile'   && profile ? <div style={{ display: 'grid', gap: 20 }}><ProfileTab token={token!} profile={profile} onSaved={setProfile} /><PasswordTab /></div>
+            : tab === 'profile'   && profile ? <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 20 }}><ProfileTab token={token!} profile={profile} onSaved={setProfile} /><PasswordTab /></div>
             : null}
         </main>
       </div>
@@ -119,7 +119,7 @@ function OverviewTab({ profile, orders, onGo, balance, memberName }: { profile: 
   const active = orders.filter(o => ACTIVE.has(o.status)).length
   const spent = orders.filter(o => !['cancelled', 'refunded'].includes(o.status)).reduce((s, o) => s + Number(o.total), 0)
   return (
-    <div style={{ display: 'grid', gap: 18 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 18 }}>
       <div>
         <h1 style={{ fontSize: 24, margin: '0 0 4px' }}>Welcome back{memberName ? `, ${memberName.split(' ')[0]}` : profile?.fullName ? `, ${profile.fullName.split(' ')[0]}` : ''} 👋</h1>
         <p style={{ color: '#64748B', margin: 0, fontSize: 14 }}>Here's a quick look at your account.</p>
@@ -152,7 +152,7 @@ function OrdersTab({ orders }: { orders: CustomerOrder[] }) {
   const [filter, setFilter] = useState('all')
   const shown = orders.filter(o => filter === 'all' || (filter === 'active' ? ACTIVE.has(o.status) : o.status === filter))
   return (
-    <div style={{ display: 'grid', gap: 16 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
         <h1 style={{ fontSize: 24, margin: 0 }}>My Orders</h1>
         <Link to="/catalog" style={{ ...btn(), textDecoration: 'none' }}>+ New order</Link>
