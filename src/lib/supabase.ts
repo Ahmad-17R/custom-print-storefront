@@ -63,4 +63,66 @@ const localClient = {
   },
 }
 
-export const supabase = (LOCAL_AUTH ? localClient : createClient(supabaseUrl, supabaseAnon)) as unknown as ReturnType<typeof createClient>
+// ── Supabase mode + team logins ──────────────────────────────────────────────
+// Customers sign in with Supabase (email or Google / Apple). Authorised users of an account
+// (team logins from My Account → Team) live in our own DB: if Supabase rejects an
+// email + password, the same sign-in box tries the team login. Their session is kept apart.
+const MEMBER_KEY = 'inkora_member_session'
+const MEMBER_API = `${API_ORIGIN}/customer/auth/member`
+const readMember = (): Session | null => {
+  try { return JSON.parse(localStorage.getItem(MEMBER_KEY) ?? 'null') } catch { return null }
+}
+const setMember = (s: Session | null, event: string) => {
+  if (s) localStorage.setItem(MEMBER_KEY, JSON.stringify(s)); else localStorage.removeItem(MEMBER_KEY)
+  listeners.forEach(l => l(event, s))
+}
+
+function supabaseWithTeamLogins() {
+  const real = createClient(supabaseUrl, supabaseAnon)
+  const overrides = {
+      async getSession() {
+        const m = readMember()
+        if (m) {
+          const ok = await fetch(`${MEMBER_API}/session`, { headers: { Authorization: `Bearer ${m.access_token}` } }).then(r => r.ok).catch(() => true)
+          if (ok) return { data: { session: m }, error: null }
+          setMember(null, 'SIGNED_OUT')
+        }
+        return real.auth.getSession()
+      },
+      onAuthStateChange(cb: Listener) {
+        listeners.add(cb)
+        const { data } = real.auth.onAuthStateChange((event, s) => { if (!readMember()) cb(event, s) })
+        return { data: { subscription: { unsubscribe: () => { listeners.delete(cb); data.subscription.unsubscribe() } } } }
+      },
+      async signInWithPassword(creds: { email: string; password: string }) {
+        const r = await real.auth.signInWithPassword(creds)
+        if (!r.error) { localStorage.removeItem(MEMBER_KEY); return r }
+        const res = await fetch(`${MEMBER_API}/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(creds) })
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}))
+          // 401 = not a team login either → show Supabase's own message
+          return res.status === 401 ? r : { data: { session: null, user: null }, error: new Error(j.error ?? 'Sign in failed') }
+        }
+        const session = await res.json() as Session
+        await real.auth.signOut().catch(() => {})
+        setMember(session, 'SIGNED_IN')
+        return { data: { session, user: session.user }, error: null }
+      },
+      async signOut() {
+        if (readMember()) { setMember(null, 'SIGNED_OUT'); return { error: null } }
+        return real.auth.signOut()
+      },
+  }
+  // Everything not overridden (signUp, signInWithOAuth, resetPasswordForEmail, …) goes straight
+  // to Supabase — a Proxy, because auth is a class instance and spreading would drop its methods
+  const auth = new Proxy(real.auth, {
+    get(target, prop, receiver) {
+      if (prop in overrides) return overrides[prop as keyof typeof overrides]
+      const v = Reflect.get(target, prop, receiver)
+      return typeof v === 'function' ? v.bind(target) : v
+    },
+  })
+  return new Proxy(real, { get: (target, prop, receiver) => prop === 'auth' ? auth : Reflect.get(target, prop, receiver) })
+}
+
+export const supabase = (LOCAL_AUTH ? localClient : supabaseWithTeamLogins()) as unknown as ReturnType<typeof createClient>
