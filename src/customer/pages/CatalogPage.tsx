@@ -64,7 +64,7 @@ export const CATALOG_PRODUCTS: CatalogCard[] = [
   {
     id: '8', slug: 'stickers', name: 'Stickers & Labels', category: 'Packaging', basePrice: 28,
     description: 'Custom die-cut stickers and product labels for any surface.',
-    image: img('photo-1619462729353-b3e82d86f2e1'),
+    image: img('photo-1572375992501-4b0892d50c69'),
     fallback: img('photo-1572375992501-4b0892d50c69'),
   },
   {
@@ -95,7 +95,7 @@ export const CATALOG_PRODUCTS: CatalogCard[] = [
     id: '13', slug: 'posters', name: 'Posters', category: 'Signage', basePrice: 45, badge: 'New',
     description: 'Vivid A3, A2 and A1 posters on premium gloss or matte paper.',
     image: img('photo-1558618666-fcd25c85cd64'),
-    fallback: img('photo-1571988850800-7e4f02d3ba2b'),
+    fallback: img('photo-1503694978374-8a2fa686963a'),
   },
   {
     id: '14', slug: 'tote-bags', name: 'Tote Bags', category: 'Apparel & Gifts', basePrice: 55,
@@ -119,7 +119,7 @@ export const CATALOG_PRODUCTS: CatalogCard[] = [
     id: '17', slug: 'lanyards', name: 'Lanyards', category: 'Apparel & Gifts', basePrice: 18,
     description: 'Branded polyester and nylon lanyards with custom logo print.',
     image: img('photo-1635107510862-53886e926b74'),
-    fallback: img('photo-1599666654775-4f7cd5d56546'),
+    fallback: img('photo-1621274790572-7c32596bc67f'),
   },
   {
     id: '18', slug: 'calendars', name: 'Desk Calendars', category: 'Stationery', basePrice: 85,
@@ -130,7 +130,7 @@ export const CATALOG_PRODUCTS: CatalogCard[] = [
   {
     id: '19', slug: 'stamps', name: 'Custom Stamps', category: 'Stationery', basePrice: 30,
     description: 'Self-inking rubber stamps with your logo or text. AED 30 flat.',
-    image: img('photo-1558618047-3c8c2a3dfb6a'),
+    image: img('photo-1619418602850-35ad20aa1700'),
     fallback: img('photo-1582719508461-905c673771fd'),
   },
   {

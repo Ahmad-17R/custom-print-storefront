@@ -67,7 +67,7 @@ const PRODUCTS: Record<string, Product> = {
     careInstructions: ['Store flat in a dry place', 'Avoid direct sunlight for extended periods', 'Handle with clean hands to prevent smudging'],
     images: [
       img('photo-1607082348824-0a96f2a4b9da'), img('photo-1553484771-371a605b060b'),
-      img('photo-1572021335469-31706a17aaef'), img('photo-1583251633146-d0545dc1c7f5'),
+      img('photo-1572021335469-31706a17aaef'),
       img('photo-1560179707-f14e90ef3623'),
     ],
     fields: [
@@ -107,7 +107,6 @@ const PRODUCTS: Record<string, Product> = {
     images: [
       img('photo-1561070791-2526d30994b5'), img('photo-1542744173-8e7e53415bb0'),
       img('photo-1504711434969-e33886168f5c'), img('photo-1578575437130-527eed3abbec'),
-      img('photo-1571988840519-a2f07af8d18a'),
     ],
     fields: [
       { label: 'Size', type: 'radio', options: ['A6 (Postcard)', 'A5 Half Page', 'A4 Full Page', 'DL (third A4)'] },
@@ -183,7 +182,7 @@ const PRODUCTS: Record<string, Product> = {
     ],
     highlights: ['Waterproof vinyl or paper stock', 'Die-cut to any shape', 'Gloss or matte finish', 'Indoor & outdoor durable', 'From 50 units'],
     images: [
-      img('photo-1619462729353-b3e82d86f2e1'), img('photo-1572375992501-4b0892d50c69'),
+      img('photo-1572375992501-4b0892d50c69'), img('photo-1626785774573-4b799315345d'),
       img('photo-1563694983011-6f4d90358083'), img('photo-1611532736597-de2d4265fba3'),
       img('photo-1576502200916-3808e07386a5'),
     ],
